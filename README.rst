@@ -17,6 +17,7 @@ Usage
 --------
 
 Violet may require a database connection for job queues::
+
     from violet import JobManager
     sched = JobManager()
 
