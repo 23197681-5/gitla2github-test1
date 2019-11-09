@@ -38,7 +38,7 @@ Violet may require a database connection for job queues::
 
     sched = JobManager(job_queue=True, db=asyncpg.create_pool(...))
     sched.create_job_queue("add", args=(int, int), handler=function)
-    sched.push_queue("add", [1, 2])
+    await sched.push_queue("add", [1, 2])
 
 Install
 --------
