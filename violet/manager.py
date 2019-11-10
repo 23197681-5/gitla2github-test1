@@ -4,7 +4,7 @@
 
 import asyncio
 import logging
-from typing import Function, List, Any
+from typing import Callable, List, Any
 
 from .errors import JobExistsError
 
@@ -27,10 +27,10 @@ class JobManager:
         self.jobs[task_id] = task
         return task
 
-    def spawn(self, func, args, *, task_id: str, **kwargs):
+    def spawn(self, func, args, *, job_id: str, **kwargs):
         raise NotImplementedError()
 
-    def spawn_periodic(self, func, args, *, period: int, task_id: str, **kwargs):
+    def spawn_periodic(self, func, args, *, period: int, job_id: str, **kwargs):
         raise NotImplementedError()
 
     def remove_job(self, job_id: str) -> None:
