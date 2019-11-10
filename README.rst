@@ -10,34 +10,53 @@ This library is:
 
 1. Very barebones. You should not expect it to be general-purpose.
 2. Designed for internal use in elixire_. Use at your own risk.
+3. Arguments to functions MUST be JSON serializable.
+   Passing instances of classes will NOT work.
 
 .. _elixire: https://gitlab.com/elixire/elixire
 
 Usage
 --------
 
-Violet may require a database connection for job queues::
+Violet requires ::
 
     from violet import JobManager
-    sched = JobManager()
+
+    # it is the responsibility of the user to configure tables. violet will
+    # not do it for the user. at most, violet will generate table definitions
+    # to guide the user.
+    sched = JobManager(db=asyncpg.create_pool(...))
 
     async def function(a, b):
         print(a + b)
 
     # will spawn function in the background
+    # (for one-shot tasks that don't need to recover)
     sched.spawn(function, [2, 2], job_id="my_function")
 
-    # will spawn function every 5 seconds indefnitely
+    # for one-shot tasks that want to recover, you can use create_worker
+    # and spawn_hard()
+    sched.create_worker('adder', function)
+
+    # actual job_id becomes 'adder:two_two'
+    sched.spawn_hard([2, 2], worker='adder', job_id='two_two')
+
+    # will spawn function every 5 seconds indefnitely (things that should run
+    # when the webapp is starting up)
     sched.spawn_periodic(function, [2, 2], period=5, job_id="my_function")
 
-    # will spawn function as a job queue (TODO nail down api for this)
+    # will spawn function as a background job queue, which makes it resumable in
+    # the face of a crash.
 
-    # it is the responsibility of the user to configure tables. violet will
-    # not do it for the user. at most, violet will generate table definitions
-    # to guide the user.
+    # the create_job_queue call should happen when starting up.
+    sched.create_job_queue(
+        "add",
+        args=(int, int),
+        handler=function,
+        max_concurrent_workers=5
+    )
 
-    sched = JobManager(job_queue=True, db=asyncpg.create_pool(...))
-    sched.create_job_queue("add", args=(int, int), handler=function)
+    # and, to push data into the queue
     await sched.push_queue("add", [1, 2])
 
 Install
