@@ -59,11 +59,20 @@ class JobManager:
         )
 
     def spawn_periodic(
-        self, function, args: List[Any], *, period: int = 5, job_id: str
+        self, function, args: List[Any], *, period: int = 5, job_id: str, **kwargs
     ):
         """Spawn a function that ticks itself periodically every
         ``period`` seconds."""
-        raise NotImplementedError()
+
+        # TODO quart context support.
+        async def ticker_func():
+            while True:
+                await function(*args)
+                await asyncio.sleep(period)
+
+        return self._create_task(
+            job_id, main_coroutine=self._wrapper(ticker_func, [], job_id, **kwargs)
+        )
 
     def create_job_queue(
         self, queue_name, *, args: Iterable[type], handler, concurrent_takes: int = 5
