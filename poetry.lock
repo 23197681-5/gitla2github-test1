@@ -12,8 +12,8 @@ docs = ["Sphinx (>=1.7.3,<1.8.0)", "sphinxcontrib-asyncio (>=0.2.0,<0.3.0)", "sp
 test = ["flake8 (>=3.5.0,<3.6.0)", "uvloop (>=0.12.0,<0.13.0)"]
 
 [metadata]
-content-hash = "8e3ade8308984d900e1c184cb16d17a4094c8e6df2eb3a31c1f43b124efd9840"
-python-versions = "^3.6"
+content-hash = "450d3bf1a5c5d5604613e737043eb48121430a03abdf454f072f9d4e927fd12e"
+python-versions = "^3.7"
 
 [metadata.files]
 asyncpg = [
