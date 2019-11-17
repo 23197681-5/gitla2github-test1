@@ -9,6 +9,7 @@ from typing import Callable, List, Any, Iterable, Dict
 from .errors import TaskExistsError
 from .models import Queue
 from .queue_worker import queue_worker
+from .utils import execute_with_json
 
 log = logging.getLogger(__name__)
 
@@ -103,7 +104,8 @@ class JobManager:
     async def push_queue(self, queue_name: str, args: List[Any], **kwargs):
         """Push data to a job queue."""
         log.debug("push %r %r", queue_name, args)
-        await self.db.execute(
+        await execute_with_json(
+            self.db,
             """
             INSERT INTO violet_jobs (queue, args) VALUES ($1, $2)
             """,
