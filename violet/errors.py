@@ -1,2 +1,2 @@
-class JobExistsError(Exception):
+class TaskExistsError(Exception):
     pass

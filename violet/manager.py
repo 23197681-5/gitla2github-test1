@@ -4,9 +4,9 @@
 
 import asyncio
 import logging
-from typing import Callable, List, Any
+from typing import Callable, List, Any, Iterable, Dict
 
-from .errors import JobExistsError
+from .errors import TaskExistsError
 
 log = logging.getLogger(__name__)
 
@@ -14,50 +14,49 @@ log = logging.getLogger(__name__)
 class JobManager:
     """Manage background jobs."""
 
-    def __init__(self, loop=None):
-        log.debug("job manager start")
+    def __init__(self, *, loop=None, db=None):
         self.loop = loop or asyncio.get_event_loop()
-        self.jobs = {}
+        self.db = db
+        self.tasks: Dict[str, asyncio.Task] = {}
 
     def _create_task(self, task_id: str, *, main_coroutine):
-        if task_id in self.jobs:
-            raise JobExistsError(f"Job '{task_id}' already exists")
+        """Wrapper around loop.create_task that ensures unique task ids
+        internally."""
+        if task_id in self.tasks:
+            raise TaskExistsError(f"Task '{task_id}' already exists")
 
         task = self.loop.create_task(main_coroutine)
-        self.jobs[task_id] = task
+        self.tasks[task_id] = task
         return task
 
-    def spawn(self, func, args, *, job_id: str, **kwargs):
+    def spawn(self, function, args: List[Any], *, job_id: str, **kwargs):
+        """Spawn the given function in the background.
+
+        This is a wrapper around loop.create_task that gives you proper logging
+        and optional recovery capabilities.
+
+        If you wish the background task is fully recoverable even in the face
+        of a crash, use a job queue.
+        """
         raise NotImplementedError()
 
-    def spawn_periodic(self, func, args, *, period: int, job_id: str, **kwargs):
+    def spawn_periodic(
+        self, function, args: List[Any], *, period: int = 5, job_id: str
+    ):
+        """Spawn a function that ticks itself periodically every
+        ``period`` seconds."""
         raise NotImplementedError()
 
-    def remove_job(self, job_id: str) -> None:
-        """Remove a job from the internal jobs dictionary. You most likely want
-        to use stop_job()."""
-        try:
-            self.jobs.pop(job_id)
-        except KeyError:
-            pass
+    def create_job_queue(
+        self, queue_name, *, args: Iterable[type], handler, concurrent_takes: int = 5
+    ):
+        """Create a job queue.
 
-    def stop_job(self, job_name: str) -> None:
-        """Stop a single job."""
-        log.debug("stopping job %r", job_name)
+        The job queue MUST be declared at the start of the application so
+        recovery can happen by then.
+        """
+        raise NotImplementedError()
 
-        try:
-            task = self.jobs[job_name]
-        except KeyError:
-            log.warning("unknown job to cancel: %r", job_name)
-            return
-
-        try:
-            task.cancel()
-        finally:
-            self.remove_job(job_name)
-
-    def stop_all(self) -> None:
-        """Stop the job manager by cancelling all jobs."""
-        log.debug("cancelling %d jobs", len(self.jobs))
-        for job_name in list(self.jobs.keys()):
-            self.stop_job(job_name)
+    async def push_queue(self, queue: str, args: List[Any], **kwargs):
+        """Push data to a job queue."""
+        raise NotImplementedError()

@@ -25,7 +25,7 @@ Violet requires ::
     # it is the responsibility of the user to configure tables. violet will
     # not do it for the user. at most, violet will generate table definitions
     # to guide the user.
-    sched = JobManager(db=asyncpg.create_pool(...))
+    sched = JobManager(db=loop.run_until_complete(asyncpg.create_pool(...)))
 
     async def function(a, b):
         print(a + b)
@@ -33,13 +33,6 @@ Violet requires ::
     # will spawn function in the background
     # (for one-shot tasks that don't need to recover)
     sched.spawn(function, [2, 2], job_id="my_function")
-
-    # for one-shot tasks that want to recover, you can use create_worker
-    # and spawn_hard()
-    sched.create_worker('adder', function)
-
-    # actual job_id becomes 'adder:two_two'
-    sched.spawn_hard([2, 2], worker='adder', job_id='two_two')
 
     # will spawn function every 5 seconds indefnitely (things that should run
     # when the webapp is starting up)
