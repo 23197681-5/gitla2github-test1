@@ -29,7 +29,21 @@ class JobManager:
         self.tasks[task_id] = task
         return task
 
-    def spawn(self, function, args: List[Any], *, job_id: str, **kwargs):
+    async def _wrapper(self, function, args, task_id, **kwargs):
+        """Wrapper for coroutines, wrapping them in try/excepts for logging"""
+        try:
+            await function(*args)
+        except asyncio.CancelledError:
+            log.debug("task %r cancelled", task_id)
+        except Exception:
+            log.exception("error at task %r", task_id)
+        finally:
+            # TODO use remove_job()
+            self.tasks.pop(task_id)
+
+    def spawn(
+        self, function, args: List[Any], *, job_id: str, **kwargs
+    ) -> asyncio.Task:
         """Spawn the given function in the background.
 
         This is a wrapper around loop.create_task that gives you proper logging
@@ -38,7 +52,11 @@ class JobManager:
         If you wish the background task is fully recoverable even in the face
         of a crash, use a job queue.
         """
-        raise NotImplementedError()
+
+        # TODO quart context support
+        return self._create_task(
+            job_id, main_coroutine=self._wrapper(function, args, job_id, **kwargs)
+        )
 
     def spawn_periodic(
         self, function, args: List[Any], *, period: int = 5, job_id: str
