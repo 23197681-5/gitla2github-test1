@@ -7,6 +7,7 @@ import logging
 from typing import Callable, List, Any, Iterable, Dict
 
 from .errors import TaskExistsError
+from .models import Queue
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ class JobManager:
         self.loop = loop or asyncio.get_event_loop()
         self.db = db
         self.tasks: Dict[str, asyncio.Task] = {}
+        self.queues: Dict[str, Queue] = {}
 
     def _create_task(self, task_id: str, *, main_coroutine):
         """Wrapper around loop.create_task that ensures unique task ids
@@ -82,7 +84,11 @@ class JobManager:
         The job queue MUST be declared at the start of the application so
         recovery can happen by then.
         """
-        raise NotImplementedError()
+        if queue_name in self.queues:
+            # TODO replace by QueueExistsError
+            raise TaskExistsError()
+
+        self.queues[queue_name] = Queue(args, handler, concurrent_takes)
 
     async def push_queue(self, queue: str, args: List[Any], **kwargs):
         """Push data to a job queue."""
