@@ -8,7 +8,7 @@ async def queue_worker(pool, queue: Queue):
         # TODO select columns, etc
         # TODO wrap in try/finally and make actual fetch be in a worker_tick
         rows = await fetch_with_json(
-            pool, "SELECT * FROM violet_jobs WHERE queue = $1", queue
+            pool, "SELECT * FROM violet_jobs WHERE queue = $1", queue.name
         )
         print(rows)
         await asyncio.sleep(queue.period)

@@ -2,6 +2,7 @@
 # Copyright 2019, elixi.re Team and the violet contributors
 # SPDX-License-Identifier: LGPL-3.0
 
+import uuid
 import asyncio
 import logging
 from typing import Callable, List, Any, Iterable, Dict
@@ -96,7 +97,7 @@ class JobManager:
             # TODO replace by QueueExistsError
             raise TaskExistsError()
 
-        self.queues[queue_name] = Queue(args, handler, takes, period)
+        self.queues[queue_name] = Queue(queue_name, args, handler, takes, period)
 
     def _create_queue_worker(self, queue: Queue):
         queue.task = self.loop.create_task(queue_worker(self.db, queue))
@@ -107,8 +108,9 @@ class JobManager:
         await execute_with_json(
             self.db,
             """
-            INSERT INTO violet_jobs (queue, args) VALUES ($1, $2)
+            INSERT INTO violet_jobs (job_id, queue, args) VALUES ($1, $2, $3)
             """,
+            uuid.uuid4().hex,
             queue_name,
             args,
         )

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Queue:
+    name: str
     args: Iterable[type]
     function: Callable[..., Awaitable[Any]]
     takes: int
