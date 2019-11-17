@@ -7,5 +7,7 @@ from dataclasses import dataclass
 class Queue:
     args: Iterable[type]
     function: Callable[..., Awaitable[Any]]
-    concurrent_takes: int
+    takes: int
+    period: int
+
     task: Optional[asyncio.Task] = None

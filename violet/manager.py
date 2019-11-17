@@ -8,6 +8,7 @@ from typing import Callable, List, Any, Iterable, Dict
 
 from .errors import TaskExistsError
 from .models import Queue
+from .queue_worker import queue_worker
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +78,13 @@ class JobManager:
         )
 
     def create_job_queue(
-        self, queue_name, *, args: Iterable[type], handler, concurrent_takes: int = 5
+        self,
+        queue_name,
+        *,
+        args: Iterable[type],
+        handler,
+        takes: int = 5,
+        period: int = 1,
     ):
         """Create a job queue.
 
@@ -88,8 +95,23 @@ class JobManager:
             # TODO replace by QueueExistsError
             raise TaskExistsError()
 
-        self.queues[queue_name] = Queue(args, handler, concurrent_takes)
+        self.queues[queue_name] = Queue(args, handler, takes, period)
 
-    async def push_queue(self, queue: str, args: List[Any], **kwargs):
+    def _create_queue_worker(self, queue: Queue):
+        queue.task = self.loop.create_task(queue_worker(self.db, queue))
+
+    async def push_queue(self, queue_name: str, args: List[Any], **kwargs):
         """Push data to a job queue."""
-        raise NotImplementedError()
+        log.debug("push %r %r", queue_name, args)
+        await self.db.execute(
+            """
+            INSERT INTO violet_jobs (queue, args) VALUES ($1, $2)
+            """,
+            queue_name,
+            args,
+        )
+        log.debug("pushed %r %r", queue_name, args)
+
+        queue = self.queues[queue_name]
+        if queue.task is None:
+            self._create_queue_worker(queue)
