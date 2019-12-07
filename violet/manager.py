@@ -100,7 +100,7 @@ class JobManager:
         self.queues[queue_name] = Queue(queue_name, args, handler, takes, period)
 
     def _create_queue_worker(self, queue: Queue):
-        queue.task = self.loop.create_task(queue_worker(self.db, queue))
+        queue.task = self.loop.create_task(queue_worker(self, queue))
 
     async def push_queue(
         self,

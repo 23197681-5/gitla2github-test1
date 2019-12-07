@@ -28,12 +28,12 @@ def main():
         ),
     )
     sched.create_job_queue(
-        "my_queue", args=(int, int), handler=my_function, takes=1, period=1
+        "my_queue", args=(int, int), handler=my_function, takes=2, period=1
     )
 
     to_watch: List[str] = []
 
-    for num in range(5):
+    for num in range(8):
 
         async def creator(num):
             job_id = await sched.push_queue("my_queue", [num, num])
