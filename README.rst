@@ -55,4 +55,8 @@ Violet requires ::
 Install
 --------
 
-TODO
+TODO: publish on pypi?
+
+::
+
+    pip install git+https://gitlab.com/elixire/violet@master
