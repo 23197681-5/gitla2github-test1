@@ -100,7 +100,13 @@ class JobManager:
         self.queues[queue_name] = Queue(queue_name, args, handler, takes, period)
 
     def _create_queue_worker(self, queue: Queue):
-        queue.task = self.loop.create_task(queue_worker(self, queue))
+        async def _wrapper():
+            try:
+                await queue_worker(self, queue)
+            except Exception:
+                log.exception("Queue worker for queue %r failed", queue.name)
+
+        queue.task = self.loop.create_task(_wrapper())
 
     async def push_queue(
         self,

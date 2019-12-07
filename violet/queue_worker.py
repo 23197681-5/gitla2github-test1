@@ -25,7 +25,7 @@ async def _create_tasks(manager, conn, queue, rows):
 
 
 async def _process_waited_tasks(conn, tasks: Dict[str, asyncio.Task]):
-    for job_id, task in tasks:
+    for job_id, task in tasks.items():
         new_state = JobState.Completed
         new_error = ""
 
@@ -39,7 +39,7 @@ async def _process_waited_tasks(conn, tasks: Dict[str, asyncio.Task]):
         await conn.execute(
             """
             UPDATE violet_jobs
-            SET state = $1
+            SET state = $1,
                 errors = $2
             WHERE job_id = $3
             """,
@@ -57,8 +57,9 @@ async def queue_worker(manager, queue: Queue):
 
     while True:
         # TODO wrap in try/finally and make actual fetch be in a worker_tick
+        log.debug("querying for queue %r", queue.name)
         rows = await fetch_with_json(
-            manager.pool,
+            manager.db,
             f"""
             SELECT job_id, args
             FROM violet_jobs
@@ -68,15 +69,15 @@ async def queue_worker(manager, queue: Queue):
             """,
             queue.name,
         )
-        log.debug("got %d jobs", len(rows))
+        log.debug("queue %r: got %d jobs", queue.name, len(rows))
 
-        async with manager.pool.acquire() as conn:
+        async with manager.db.acquire() as conn:
             async with conn.transaction():
                 tasks = await _create_tasks(manager, conn, queue, rows)
 
         done, pending = await asyncio.wait(tasks.values())
 
-        async with manager.pool.acquire() as conn:
+        async with manager.db.acquire() as conn:
             async with conn.transaction():
                 await _process_waited_tasks(conn, tasks)
 
