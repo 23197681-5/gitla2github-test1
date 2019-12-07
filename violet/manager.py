@@ -105,6 +105,8 @@ class JobManager:
                 await queue_worker(self, queue)
             except Exception:
                 log.exception("Queue worker for queue %r failed", queue.name)
+            finally:
+                queue.task = None
 
         queue.task = self.loop.create_task(_wrapper())
 

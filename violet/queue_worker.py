@@ -63,7 +63,7 @@ async def queue_worker(manager, queue: Queue):
             f"""
             SELECT job_id, args
             FROM violet_jobs
-            WHERE queue = $1
+            WHERE queue = $1 AND state = 0
             ORDER BY inserted_at
             LIMIT {queue.takes}
             """,
@@ -74,6 +74,10 @@ async def queue_worker(manager, queue: Queue):
         async with manager.db.acquire() as conn:
             async with conn.transaction():
                 tasks = await _create_tasks(manager, conn, queue, rows)
+
+        if not tasks:
+            log.debug("queue %r is empty, work stop", queue.name)
+            return
 
         done, pending = await asyncio.wait(tasks.values())
 
