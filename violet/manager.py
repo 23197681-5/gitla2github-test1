@@ -8,9 +8,9 @@ import logging
 from typing import Callable, List, Any, Iterable, Dict, Optional
 
 from .errors import TaskExistsError
-from .models import Queue
+from .models import Queue, QueueJobStatus
 from .queue_worker import queue_worker
-from .utils import execute_with_json
+from .utils import execute_with_json, fetchrow_with_json
 
 log = logging.getLogger(__name__)
 
@@ -135,3 +135,17 @@ class JobManager:
             self._create_queue_worker(queue)
 
         return job_id
+
+    async def fetch_queue_job_status(self, job_id: str) -> QueueJobStatus:
+        row = await fetchrow_with_json(
+            self.db,
+            """
+            SELECT FROM violet_jobs
+                queue, state, fail_mode, errors, args, inserted_at
+            WHERE
+                job_id = $1
+            """,
+            job_id,
+        )
+
+        return QueueJobStatus(**row)

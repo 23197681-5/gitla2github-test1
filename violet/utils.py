@@ -25,3 +25,10 @@ async def fetch_with_json(pool, *args, **kwargs) -> Any:
     async with pool.acquire() as conn:
         await pg_set_json(conn)
         return await conn.fetch(*args, **kwargs)
+
+
+async def fetchrow_with_json(pool, *args, **kwargs) -> Any:
+    """Execute SQL with support for json and jsonb."""
+    async with pool.acquire() as conn:
+        await pg_set_json(conn)
+        return await conn.fetchrow(*args, **kwargs)
