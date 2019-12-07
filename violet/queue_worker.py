@@ -33,6 +33,8 @@ async def _create_tasks(manager, conn, queue, rows):
 
 async def _process_waited_tasks(conn, tasks: Dict[str, asyncio.Task]):
     for job_id, task in tasks.items():
+        assert task.done()
+
         new_state = JobState.Completed
         new_error = ""
 
@@ -95,6 +97,7 @@ async def queue_worker(manager, queue: Queue):
             return
 
         done, pending = await asyncio.wait(tasks.values())
+        assert not pending
 
         async with manager.db.acquire() as conn:
             async with conn.transaction():
