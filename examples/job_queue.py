@@ -27,11 +27,11 @@ def main():
         ),
     )
     sched.create_job_queue(
-        "my_function", args=(int, int), handler=my_function, takes=1, period=1
+        "my_queue", args=(int, int), handler=my_function, takes=1, period=1
     )
 
     for num in range(5):
-        loop.create_task(sched.push_queue("my_function", [num, num]))
+        loop.create_task(sched.push_queue("my_queue", [num, num]))
 
     loop.run_until_complete(asyncio.sleep(10))
 

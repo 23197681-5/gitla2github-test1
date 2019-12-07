@@ -5,7 +5,7 @@
 import uuid
 import asyncio
 import logging
-from typing import Callable, List, Any, Iterable, Dict
+from typing import Callable, List, Any, Iterable, Dict, Optional
 
 from .errors import TaskExistsError
 from .models import Queue
@@ -102,15 +102,29 @@ class JobManager:
     def _create_queue_worker(self, queue: Queue):
         queue.task = self.loop.create_task(queue_worker(self.db, queue))
 
-    async def push_queue(self, queue_name: str, args: List[Any], **kwargs):
+    async def push_queue(
+        self,
+        queue_name: str,
+        args: List[Any],
+        *,
+        job_id: Optional[str] = None,
+        **kwargs,
+    ):
         """Push data to a job queue."""
-        log.debug("push %r %r", queue_name, args)
+
+        # ensure queue was declared
+        if queue_name not in self.queues:
+            raise ValueError(f"Queue {queue_name} does not exist")
+
+        log.debug("try push %r %r", queue_name, args)
+        job_id = job_id or uuid.uuid4().hex
+
         await execute_with_json(
             self.db,
             """
             INSERT INTO violet_jobs (job_id, queue, args) VALUES ($1, $2, $3)
             """,
-            uuid.uuid4().hex,
+            job_id,
             queue_name,
             args,
         )
@@ -119,3 +133,5 @@ class JobManager:
         queue = self.queues[queue_name]
         if queue.task is None:
             self._create_queue_worker(queue)
+
+        return job_id
