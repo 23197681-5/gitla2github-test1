@@ -12,7 +12,7 @@ from .utils import fetch_with_json
 log = logging.getLogger(__name__)
 
 
-async def _create_tasks(manager, conn, queue, rows):
+async def acquire_jobs(manager, conn, queue, rows):
     tasks: Dict[str, asyncio.Task] = {}
 
     for row in rows:
@@ -58,10 +58,6 @@ async def _process_waited_tasks(conn, tasks: Dict[str, asyncio.Task]):
         )
 
 
-async def _resume_queue():
-    pass
-
-
 async def fetch_jobs(conn, queue: Queue, state=JobState.NotTaken) -> list:
     log.debug("querying state=%r for queue %r", state, queue.name)
     return await fetch_with_json(
@@ -78,9 +74,20 @@ async def fetch_jobs(conn, queue: Queue, state=JobState.NotTaken) -> list:
     )
 
 
+async def _resume_queue(manager, queue):
+    rows = await fetch_jobs(manager.db, queue, state=JobState.Taken)
+
+    async with manager.db.acquire() as conn:
+        async with conn.transaction():
+            tasks = await acquire_jobs(manager, conn, queue, rows)
+
+    # TODO run jobs
+
+    # TODO release jobs
+
+
 async def queue_worker(manager, queue: Queue):
-    # TODO fetch jobs with state = 1 (basic recovery)
-    # and work on them before main loop
+    await _resume_queue(manager.pool, queue)
 
     while True:
         # TODO wrap in try/finally and make actual fetch be in a worker_tick
@@ -90,7 +97,7 @@ async def queue_worker(manager, queue: Queue):
 
         async with manager.db.acquire() as conn:
             async with conn.transaction():
-                tasks = await _create_tasks(manager, conn, queue, rows)
+                tasks = await acquire_jobs(manager, conn, queue, rows)
 
         if not tasks:
             log.debug("queue %r is empty, work stop", queue.name)
