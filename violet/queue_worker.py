@@ -1,8 +1,11 @@
 import logging
 import asyncio
-from typing import Dict
+from typing import Dict, List
+
 from .models import Queue, JobState
 from .utils import fetch_with_json
+
+log = logging.getLogger(__name__)
 
 
 async def _create_tasks(manager, conn, queue, rows):
@@ -49,26 +52,34 @@ async def _process_waited_tasks(conn, tasks: Dict[str, asyncio.Task]):
         )
 
 
-async def queue_worker(manager, queue: Queue):
-    log = logging.getLogger(f"violet.{queue.name}")
+async def _resume_queue():
+    pass
 
+
+async def fetch_jobs(conn, queue: Queue, state=JobState.NotTaken) -> list:
+    log.debug("querying state=%r for queue %r", state, queue.name)
+    return await fetch_with_json(
+        conn,
+        f"""
+        SELECT job_id, args
+        FROM violet_jobs
+        WHERE queue = $1 AND state = $2
+        ORDER BY inserted_at
+        LIMIT {queue.takes}
+        """,
+        queue.name,
+        state,
+    )
+
+
+async def queue_worker(manager, queue: Queue):
     # TODO fetch jobs with state = 1 (basic recovery)
     # and work on them before main loop
 
     while True:
         # TODO wrap in try/finally and make actual fetch be in a worker_tick
-        log.debug("querying for queue %r", queue.name)
-        rows = await fetch_with_json(
-            manager.db,
-            f"""
-            SELECT job_id, args
-            FROM violet_jobs
-            WHERE queue = $1 AND state = 0
-            ORDER BY inserted_at
-            LIMIT {queue.takes}
-            """,
-            queue.name,
-        )
+        # TODO determine ^ based if we actually need a finally block
+        rows = await fetch_jobs(manager.db, queue)
         log.debug("queue %r: got %d jobs", queue.name, len(rows))
 
         async with manager.db.acquire() as conn:
