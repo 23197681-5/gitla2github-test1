@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+from typing import List
 
 import asyncpg
 from violet import JobManager
@@ -30,9 +31,25 @@ def main():
         "my_queue", args=(int, int), handler=my_function, takes=1, period=1
     )
 
-    for num in range(5):
-        loop.create_task(sched.push_queue("my_queue", [num, num]))
+    to_watch: List[str] = []
 
+    for num in range(5):
+
+        async def creator(num):
+            job_id = await sched.push_queue("my_queue", [num, num])
+            to_watch.append(job_id)
+
+        loop.create_task(creator(num))
+
+    async def watcher():
+        while True:
+            for job_id in to_watch:
+                status = await sched.fetch_queue_job_status(job_id)
+                print(f"{job_id} => {status.state}")
+
+            await asyncio.sleep(1)
+
+    loop.create_task(watcher())
     loop.run_until_complete(asyncio.sleep(10))
 
 

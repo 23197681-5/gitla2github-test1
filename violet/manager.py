@@ -140,12 +140,13 @@ class JobManager:
         row = await fetchrow_with_json(
             self.db,
             """
-            SELECT FROM violet_jobs
+            SELECT
                 queue, state, fail_mode, errors, args, inserted_at
+            FROM violet_jobs
             WHERE
                 job_id = $1
             """,
             job_id,
         )
 
-        return QueueJobStatus(**row)
+        return QueueJobStatus(*row)
