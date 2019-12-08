@@ -4,6 +4,7 @@
 
 import logging
 import asyncio
+import traceback
 from typing import Dict
 
 from .models import Queue, JobState, QueueJobContext
@@ -39,12 +40,11 @@ async def release_tasks(conn, tasks: Dict[str, asyncio.Task]):
         new_state = JobState.Completed
         new_error = ""
 
-        exception = task.exception()
-        if exception is not None:
+        try:
+            task.result()
+        except Exception:
             new_state = JobState.Error
-
-            # TODO make this a traceback
-            new_error = repr(exception)
+            new_error = traceback.format_exc()
 
         await conn.execute(
             """
