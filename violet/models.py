@@ -35,3 +35,10 @@ class QueueJobStatus:
     errors: str
     args: Iterable[type]
     inserted_at: datetime.datetime
+
+
+@dataclass
+class QueueJobContext:
+    # TODO fix typing and recursive import that would happen for this maybe
+    manager: Any
+    job_id: str

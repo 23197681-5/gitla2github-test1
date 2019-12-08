@@ -7,10 +7,9 @@ import asyncpg
 from violet import JobManager
 
 
-async def my_function(a, b):
-    # TODO push job_id to all handlers
-    # TODO update internal state on job
+async def my_function(ctx, a, b):
     print(a + b)
+    await ctx.manager.set_queue_job_internal_state(ctx.job_id, {"note": "awoo"})
 
 
 def main():
@@ -52,7 +51,10 @@ def main():
                 statuses[job_id] = status
 
             for job_id, status in statuses.items():
-                logging.info("job %r status %r", job_id, status.state)
+                if status.state == 3:
+                    logging.info("job %r error %r", job_id, status.errors)
+                else:
+                    logging.error("job %r state %r", job_id, status.state)
 
             await asyncio.sleep(1)
 

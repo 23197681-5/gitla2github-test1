@@ -6,7 +6,7 @@ import logging
 import asyncio
 from typing import Dict
 
-from .models import Queue, JobState
+from .models import Queue, JobState, QueueJobContext
 from .utils import fetch_with_json
 
 log = logging.getLogger(__name__)
@@ -17,7 +17,8 @@ async def acquire_jobs(manager, conn, queue, rows):
 
     for row in rows:
         job_id = row["job_id"]
-        task = manager.loop.create_task(queue.function(*row["args"]))
+        ctx = QueueJobContext(manager, job_id)
+        task = manager.loop.create_task(queue.function(ctx, *row["args"]))
         tasks[job_id] = task
         await conn.execute(
             """
