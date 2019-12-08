@@ -31,7 +31,7 @@ async def acquire_jobs(manager, conn, queue, rows):
     return tasks
 
 
-async def _process_waited_tasks(conn, tasks: Dict[str, asyncio.Task]):
+async def release_tasks(conn, tasks: Dict[str, asyncio.Task]):
     for job_id, task in tasks.items():
         assert task.done()
 
@@ -74,40 +74,33 @@ async def fetch_jobs(conn, queue: Queue, state=JobState.NotTaken) -> list:
     )
 
 
-async def _resume_queue(manager, queue):
-    rows = await fetch_jobs(manager.db, queue, state=JobState.Taken)
+class StopQueueWorker(Exception):
+    pass
+
+
+async def run_jobs(manager, queue, state: JobState = JobState.NotTaken):
+    rows = await fetch_jobs(manager.db, queue, state=state)
+    log.debug("queue %r got %d jobs in state %r", queue.name, len(rows), state)
 
     async with manager.db.acquire() as conn:
         async with conn.transaction():
             tasks = await acquire_jobs(manager, conn, queue, rows)
 
-    # TODO run jobs
+    if not tasks:
+        log.debug("queue %r is empty, work stop", queue.name)
+        raise StopQueueWorker()
 
-    # TODO release jobs
+    done, pending = await asyncio.wait(tasks.values())
+    assert not pending
+
+    async with manager.db.acquire() as conn:
+        async with conn.transaction():
+            await release_tasks(conn, tasks)
 
 
 async def queue_worker(manager, queue: Queue):
-    await _resume_queue(manager.pool, queue)
+    await run_jobs(manager, queue, JobState.Taken)
 
     while True:
-        # TODO wrap in try/finally and make actual fetch be in a worker_tick
-        # TODO determine ^ based if we actually need a finally block
-        rows = await fetch_jobs(manager.db, queue)
-        log.debug("queue %r: got %d jobs", queue.name, len(rows))
-
-        async with manager.db.acquire() as conn:
-            async with conn.transaction():
-                tasks = await acquire_jobs(manager, conn, queue, rows)
-
-        if not tasks:
-            log.debug("queue %r is empty, work stop", queue.name)
-            return
-
-        done, pending = await asyncio.wait(tasks.values())
-        assert not pending
-
-        async with manager.db.acquire() as conn:
-            async with conn.transaction():
-                await _process_waited_tasks(conn, tasks)
-
+        await run_jobs(manager, queue)
         await asyncio.sleep(queue.period)

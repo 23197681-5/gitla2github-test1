@@ -9,7 +9,7 @@ from typing import Callable, List, Any, Iterable, Dict, Optional
 
 from .errors import TaskExistsError
 from .models import Queue, QueueJobStatus
-from .queue_worker import queue_worker
+from .queue_worker import queue_worker, StopQueueWorker
 from .utils import execute_with_json, fetchrow_with_json
 
 log = logging.getLogger(__name__)
@@ -103,6 +103,8 @@ class JobManager:
         async def _wrapper():
             try:
                 await queue_worker(self, queue)
+            except StopQueueWorker:
+                pass
             except Exception:
                 log.exception("Queue worker for queue %r failed", queue.name)
             finally:
