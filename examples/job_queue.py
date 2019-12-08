@@ -8,6 +8,8 @@ from violet import JobManager
 
 
 async def my_function(a, b):
+    # TODO push job_id to all handlers
+    # TODO update internal state on job
     print(a + b)
 
 

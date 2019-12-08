@@ -6,4 +6,5 @@ create table if not exists violet_jobs (
     errors text default '',
     args jsonb default '{}',
     inserted_at timestamp without time zone default (now() at time zone 'utc'),
+    internal_state jsonb default '{}'
 );

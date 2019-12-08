@@ -159,3 +159,18 @@ class JobManager:
         )
 
         return QueueJobStatus(*row)
+
+    async def set_queue_job_internal_state(
+        self, job_id: str, internal_state: Dict[Any, Any]
+    ) -> None:
+        await execute_with_json(
+            self.db,
+            """
+            UPDATE violet_jobs
+            SET internal_state = $1
+            WHERE
+                job_id = $2
+            """,
+            internal_state,
+            job_id,
+        )
