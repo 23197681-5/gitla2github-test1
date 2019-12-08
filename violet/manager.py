@@ -5,7 +5,7 @@
 import uuid
 import asyncio
 import logging
-from typing import Callable, List, Any, Iterable, Dict, Optional
+from typing import List, Any, Iterable, Dict, Optional
 
 from .errors import TaskExistsError
 from .models import Queue, QueueJobStatus

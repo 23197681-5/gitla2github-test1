@@ -5,7 +5,7 @@
 import enum
 import asyncio
 import datetime
-from typing import Iterable, Callable, Any, List, Awaitable, Optional
+from typing import Iterable, Callable, Any, Awaitable, Optional
 from dataclasses import dataclass
 
 

@@ -4,7 +4,7 @@
 
 import logging
 import asyncio
-from typing import Dict, List
+from typing import Dict
 
 from .models import Queue, JobState
 from .utils import fetch_with_json
