@@ -7,7 +7,7 @@ import asyncio
 import logging
 from typing import List, Any, Iterable, Dict, Optional
 
-from .errors import TaskExistsError
+from .errors import TaskExistsError, QueueExistsError
 from .models import Queue, QueueJobStatus
 from .queue_worker import queue_worker, StopQueueWorker
 from .utils import execute_with_json, fetchrow_with_json
@@ -94,8 +94,7 @@ class JobManager:
         recovery can happen by then.
         """
         if queue_name in self.queues:
-            # TODO replace by QueueExistsError
-            raise TaskExistsError()
+            raise QueueExistsError()
 
         self.queues[queue_name] = Queue(queue_name, args, handler, takes, period)
 

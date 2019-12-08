@@ -5,3 +5,7 @@
 
 class TaskExistsError(Exception):
     pass
+
+
+class QueueExistsError(Exception):
+    pass
