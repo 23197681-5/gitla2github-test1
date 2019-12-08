@@ -78,7 +78,9 @@ class StopQueueWorker(Exception):
     pass
 
 
-async def run_jobs(manager, queue, state: JobState = JobState.NotTaken):
+async def run_jobs(
+    manager, queue, state: JobState = JobState.NotTaken, *, raise_on_empty: bool = True
+):
     rows = await fetch_jobs(manager.db, queue, state=state)
     log.debug("queue %r got %d jobs in state %r", queue.name, len(rows), state)
 
@@ -88,7 +90,10 @@ async def run_jobs(manager, queue, state: JobState = JobState.NotTaken):
 
     if not tasks:
         log.debug("queue %r is empty, work stop", queue.name)
-        raise StopQueueWorker()
+        if raise_on_empty:
+            raise StopQueueWorker()
+        else:
+            return
 
     done, pending = await asyncio.wait(tasks.values())
     assert not pending
@@ -99,7 +104,7 @@ async def run_jobs(manager, queue, state: JobState = JobState.NotTaken):
 
 
 async def queue_worker(manager, queue: Queue):
-    await run_jobs(manager, queue, JobState.Taken)
+    await run_jobs(manager, queue, JobState.Taken, raise_on_empty=False)
 
     while True:
         await run_jobs(manager, queue)
