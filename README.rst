@@ -4,6 +4,9 @@ violet
 An asyncio background job library, or, as I like to call it,
 a more powerful wrapper `asyncio.create_task`.
 
+(this project's name is inspired by Violet Evergarden, an anime about a
+robot girl's experience with trauma, and neuroatypical socialization in general.)
+
 Note
 --------
 This library is:
