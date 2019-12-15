@@ -194,3 +194,31 @@ class JobManager:
             internal_state,
             job_id,
         )
+
+    def _remove_task(self, task_id: str) -> None:
+        """Remove a job from the internal task list."""
+        try:
+            self.tasks.pop(task_id)
+        except KeyError:
+            pass
+
+    def stop(self, task_id: str) -> None:
+        log.debug("stopping task %r", task_id)
+
+        try:
+            task = self.tasks[task_id]
+            task.cancel()
+        except KeyError:
+            log.warning("unknown task to cancel: %r", task_id)
+        finally:
+            # as a last measure, try to pop() the job
+            # post-cancel. if that fails, the job probably
+            # already cleaned itself.
+            self._remove_task(task_id)
+
+    def stop_all(self) -> None:
+        """Stop the job manager by cancelling all tasks."""
+        log.debug("cancelling %d tasks", len(self.tasks))
+
+        for task_id in list(self.tasks.keys()):
+            self.stop(job_name)
