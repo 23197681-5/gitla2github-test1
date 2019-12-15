@@ -7,7 +7,7 @@ license = "LGPL-3.0"
 
 [tool.poetry.dependencies]
 python = "^3.7"
-asyncpg = "^0.19.0"
+asyncpg = "0.20.0"
 
 [tool.poetry.dev-dependencies]
 
