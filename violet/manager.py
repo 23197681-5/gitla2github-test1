@@ -64,9 +64,8 @@ class JobManager:
         except Exception:
             log.exception("error at task %r", task_id)
         finally:
-            # TODO use remove_job()
             # TODO failure modes for single tasks
-            self.tasks.pop(task_id)
+            self._remove_task(task_id)
 
     def spawn(
         self, function, args: List[Any], *, job_id: str, **kwargs
