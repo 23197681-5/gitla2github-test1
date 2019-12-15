@@ -221,4 +221,4 @@ class JobManager:
         log.debug("cancelling %d tasks", len(self.tasks))
 
         for task_id in list(self.tasks.keys()):
-            self.stop(job_name)
+            self.stop(task_id)
