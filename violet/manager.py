@@ -36,6 +36,13 @@ class JobManager:
         self.queues: Dict[str, Queue] = {}
         self.context_creator = context_function or EmptyAsyncContext
 
+    def exists(self, task_id: str) -> bool:
+        """Return if a given task exists in the current running tasks.
+
+        TODO stable task ids for queue workers?
+        """
+        return task_id in self.tasks
+
     def _create_task(self, task_id: str, *, main_coroutine):
         """Wrapper around loop.create_task that ensures unique task ids
         internally."""
@@ -73,7 +80,6 @@ class JobManager:
         of a crash, use a job queue.
         """
 
-        # TODO quart context support
         return self._create_task(
             job_id, main_coroutine=self._wrapper(function, args, job_id, **kwargs)
         )
