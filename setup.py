@@ -23,5 +23,5 @@ setup(
     packages=['violet'],
     package_dir={"": "."},
     package_data={},
-    install_requires=['asyncpg==0.*,>=0.19.0'],
+    install_requires=['asyncpg==0.20.0'],
 )
