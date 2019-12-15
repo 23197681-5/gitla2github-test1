@@ -15,14 +15,26 @@ from .utils import execute_with_json, fetchrow_with_json
 log = logging.getLogger(__name__)
 
 
+class EmptyAsyncContext:
+    def __init__(self):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, type, value, traceback):
+        return None
+
+
 class JobManager:
     """Manage background jobs."""
 
-    def __init__(self, *, loop=None, db=None):
+    def __init__(self, *, loop=None, db=None, context_function=None):
         self.loop = loop or asyncio.get_event_loop()
         self.db = db
         self.tasks: Dict[str, asyncio.Task] = {}
         self.queues: Dict[str, Queue] = {}
+        self.context_creator = context_function or EmptyAsyncContext
 
     def _create_task(self, task_id: str, *, main_coroutine):
         """Wrapper around loop.create_task that ensures unique task ids
@@ -37,13 +49,16 @@ class JobManager:
     async def _wrapper(self, function, args, task_id, **kwargs):
         """Wrapper for coroutines, wrapping them in try/excepts for logging"""
         try:
-            await function(*args)
+            log.debug("task tick: %r", task_id)
+            async with self.context_creator():
+                await function(*args)
         except asyncio.CancelledError:
             log.debug("task %r cancelled", task_id)
         except Exception:
             log.exception("error at task %r", task_id)
         finally:
             # TODO use remove_job()
+            # TODO failure modes for single tasks
             self.tasks.pop(task_id)
 
     def spawn(
@@ -69,7 +84,6 @@ class JobManager:
         """Spawn a function that ticks itself periodically every
         ``period`` seconds."""
 
-        # TODO quart context support.
         async def ticker_func():
             while True:
                 await function(*args)
