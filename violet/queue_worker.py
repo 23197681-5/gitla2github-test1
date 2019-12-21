@@ -107,7 +107,7 @@ async def run_jobs(
             tasks = await acquire_jobs(manager, conn, queue, rows)
 
     if not tasks:
-        actually_empty = await manager.db.fetchval(
+        actually_empty = not await manager.db.fetchval(
             """SELECT count(*) > 0 FROM violet_jobs WHERE queue = $1""", queue.name
         )
         log.debug(
