@@ -131,6 +131,9 @@ class JobManager:
 
         queue.task = self.loop.create_task(_wrapper())
 
+    def create_queue_worker(self, queue_id: str):
+        self._create_queue_worker(self.queues[queue_id])
+
     async def push_queue(
         self,
         queue_name: str,
