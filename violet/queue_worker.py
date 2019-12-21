@@ -112,7 +112,7 @@ async def run_jobs(
             SELECT count(*) > 0
             FROM violet_jobs
             WHERE queue = $1
-              AND (now() at time zone 'utc') >= scheduled_at
+              AND (now() at time zone 'utc') <= scheduled_at
             """,
             queue.name,
         )
