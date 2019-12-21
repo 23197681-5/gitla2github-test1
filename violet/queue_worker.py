@@ -107,8 +107,14 @@ async def run_jobs(
             tasks = await acquire_jobs(manager, conn, queue, rows)
 
     if not tasks:
-        log.debug("queue %r is empty, work stop", queue.name)
-        if raise_on_empty:
+        actually_empty = await manager.db.fetchval(
+            """SELECT count(*) > 0 FROM violet_jobs WHERE queue = $1""", queue.name
+        )
+        log.debug(
+            "queue %r without jobs, is it full empty?", queue.name, actually_empty
+        )
+
+        if raise_on_empty and actually_empty:
             raise StopQueueWorker()
         else:
             return
