@@ -111,7 +111,7 @@ async def run_jobs(
             """SELECT count(*) > 0 FROM violet_jobs WHERE queue = $1""", queue.name
         )
         log.debug(
-            "queue %r without jobs, is it full empty?", queue.name, actually_empty
+            "queue %r without jobs, is it full empty? %r", queue.name, actually_empty
         )
 
         if raise_on_empty and actually_empty:
