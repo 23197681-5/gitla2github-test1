@@ -2,6 +2,7 @@
 # Copyright 2019, elixi.re Team and the violet contributors
 # SPDX-License-Identifier: LGPL-3.0
 
+import datetime
 import uuid
 import asyncio
 import logging
@@ -147,14 +148,20 @@ class JobManager:
         log.debug("try push %r %r", queue_name, args)
         job_id = job_id or uuid.uuid4().hex
 
+        now = kwargs.get("scheduled_at") or datetime.datetime.utcnow()
+
         await execute_with_json(
             self.db,
             """
-            INSERT INTO violet_jobs (job_id, queue, args) VALUES ($1, $2, $3)
+            INSERT INTO violet_jobs
+                (job_id, queue, args, inserted_at)
+            VALUES
+                ($1, $2, $3, $4)
             """,
             job_id,
             queue_name,
             args,
+            now,
         )
         log.debug("pushed %r %r", queue_name, args)
 
