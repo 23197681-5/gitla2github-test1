@@ -124,6 +124,8 @@ class JobManager:
                 await queue_worker(self, queue)
             except StopQueueWorker:
                 pass
+            except asyncio.CancelledError:
+                log.debug("queue worker for %r cancelled", queue.name)
             except Exception:
                 log.exception("Queue worker for queue %r failed", queue.name)
             finally:
