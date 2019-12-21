@@ -157,7 +157,7 @@ class JobManager:
             self.db,
             """
             INSERT INTO violet_jobs
-                (job_id, queue, args, inserted_at)
+                (job_id, queue, args, scheduled_at)
             VALUES
                 ($1, $2, $3, $4)
             """,
