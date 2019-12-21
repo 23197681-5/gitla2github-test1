@@ -60,14 +60,23 @@ async def release_tasks(conn, tasks: Dict[str, asyncio.Task]):
         )
 
 
-async def fetch_jobs(conn, queue: Queue, state=JobState.NotTaken) -> list:
+async def fetch_jobs(
+    conn, queue: Queue, state=JobState.NotTaken, scheduled_only: bool = False
+) -> list:
     log.debug("querying state=%r for queue %r", state, queue.name)
+
+    scheduled_where = (
+        "AND scheduled_at >= (now() at time zone 'utc')" if scheduled_only else ""
+    )
     return await fetch_with_json(
         conn,
         f"""
         SELECT job_id, args
         FROM violet_jobs
-        WHERE queue = $1 AND state = $2
+        WHERE
+            queue = $1
+        AND state = $2
+        {scheduled_where}
         ORDER BY inserted_at
         LIMIT {queue.takes}
         """,
@@ -81,9 +90,16 @@ class StopQueueWorker(Exception):
 
 
 async def run_jobs(
-    manager, queue, state: JobState = JobState.NotTaken, *, raise_on_empty: bool = True
+    manager,
+    queue,
+    state: JobState = JobState.NotTaken,
+    *,
+    raise_on_empty: bool = True,
+    scheduled_only: bool = False,
 ):
-    rows = await fetch_jobs(manager.db, queue, state=state)
+    rows = await fetch_jobs(
+        manager.db, queue, state=state, scheduled_only=scheduled_only
+    )
     log.debug("queue %r got %d jobs in state %r", queue.name, len(rows), state)
 
     async with manager.db.acquire() as conn:
@@ -109,5 +125,5 @@ async def queue_worker(manager, queue: Queue):
     await run_jobs(manager, queue, JobState.Taken, raise_on_empty=False)
 
     while True:
-        await run_jobs(manager, queue)
+        await run_jobs(manager, queue, scheduled_only=True)
         await asyncio.sleep(queue.period)
