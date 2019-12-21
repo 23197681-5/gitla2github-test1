@@ -45,6 +45,7 @@ async def release_tasks(conn, tasks: Dict[str, asyncio.Task]):
         except Exception:
             new_state = JobState.Error
             new_error = traceback.format_exc()
+            log.error("error on job %r, '%s'", job_id, new_error)
 
         await conn.execute(
             """
