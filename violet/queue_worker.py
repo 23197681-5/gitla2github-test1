@@ -108,7 +108,13 @@ async def run_jobs(
 
     if not tasks:
         actually_empty = not await manager.db.fetchval(
-            """SELECT count(*) > 0 FROM violet_jobs WHERE queue = $1""", queue.name
+            """
+            SELECT count(*) > 0
+            FROM violet_jobs
+            WHERE queue = $1
+              AND (now() at time zone 'utc') >= scheduled_at
+            """,
+            queue.name,
         )
         log.debug(
             "queue %r without jobs, is it full empty? %r", queue.name, actually_empty
