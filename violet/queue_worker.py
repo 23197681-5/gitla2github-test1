@@ -66,7 +66,7 @@ async def fetch_jobs(
     log.debug("querying state=%r for queue %r", state, queue.name)
 
     scheduled_where = (
-        "AND scheduled_at >= (now() at time zone 'utc')" if scheduled_only else ""
+        "AND (now() at time zone 'utc') >= scheduled_at" if scheduled_only else ""
     )
     return await fetch_with_json(
         conn,
