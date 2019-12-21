@@ -107,6 +107,7 @@ class JobManager:
         handler,
         takes: int = 5,
         period: int = 1,
+        start_existing_jobs: bool = True,
     ):
         """Create a job queue.
 
@@ -116,7 +117,9 @@ class JobManager:
         if queue_name in self.queues:
             raise QueueExistsError()
 
-        self.queues[queue_name] = Queue(queue_name, args, handler, takes, period)
+        self.queues[queue_name] = Queue(
+            queue_name, args, handler, takes, period, start_existing_jobs
+        )
 
     def _create_queue_worker(self, queue: Queue):
         async def _wrapper():

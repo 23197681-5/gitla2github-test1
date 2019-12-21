@@ -134,7 +134,8 @@ async def run_jobs(
 
 
 async def queue_worker(manager, queue: Queue):
-    await run_jobs(manager, queue, JobState.Taken, raise_on_empty=False)
+    if queue.start_existing_jobs:
+        await run_jobs(manager, queue, JobState.Taken, raise_on_empty=False)
 
     while True:
         await run_jobs(manager, queue, scheduled_only=True)
