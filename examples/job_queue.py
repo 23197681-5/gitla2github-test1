@@ -9,7 +9,9 @@ from violet import JobManager
 
 async def my_function(ctx, a, b):
     print(a + b)
-    await ctx.manager.set_queue_job_internal_state(ctx.job_id, {"note": "awoo"})
+    await ctx.manager.set_job_state(ctx.job_id, {"note": "awoo"})
+    state = await ctx.manager.fetch_job_state(ctx.job_id)
+    assert state["note"] == "awoo"
 
 
 def main():

@@ -194,9 +194,7 @@ class JobManager:
 
         return QueueJobStatus(*row)
 
-    async def set_queue_job_internal_state(
-        self, job_id: str, internal_state: Dict[Any, Any]
-    ) -> None:
+    async def set_job_state(self, job_id: str, state: Dict[Any, Any]) -> None:
         await execute_with_json(
             self.db,
             """
@@ -205,9 +203,23 @@ class JobManager:
             WHERE
                 job_id = $2
             """,
-            internal_state,
+            state,
             job_id,
         )
+
+    async def fetch_job_state(self, job_id: str) -> Optional[Dict[Any, Any]]:
+        row = await fetchrow_with_json(
+            self.db,
+            """
+            SELECT internal_state AS state
+            FROM violet_jobs
+            WHERE
+                job_id = $1
+            """,
+            job_id,
+        )
+
+        return row["state"] if row is not None else None
 
     def _remove_task(self, task_id: str) -> None:
         """Remove a job from the internal task list."""
