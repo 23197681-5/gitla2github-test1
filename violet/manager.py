@@ -124,7 +124,8 @@ class JobManager:
     def _create_queue_worker(self, queue: Queue):
         async def _wrapper():
             try:
-                await queue_worker(self, queue)
+                async with self.context_creator():
+                    await queue_worker(self, queue)
             except StopQueueWorker:
                 pass
             except asyncio.CancelledError:
