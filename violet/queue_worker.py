@@ -24,7 +24,7 @@ async def acquire_jobs(manager, conn, queue, rows):
         await conn.execute(
             """
             UPDATE violet_jobs
-            SET state = 1
+            SET state = 1, taken_at = (now() at time zone 'utc')
             WHERE job_id = $1
             """,
             job_id,
