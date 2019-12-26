@@ -37,8 +37,10 @@ class JobManager:
         self.db = db
         self.tasks: Dict[str, asyncio.Task] = {}
         self.queues: Dict[str, Queue] = {}
+
         self.events: Dict[str, JobEvent] = defaultdict(JobEvent)
-        self.empty_waiters: Dict[str, JobEvent] = defaultdict(JobEvent)
+        self.empty_waiters: Dict[str, asyncio.Task] = {}
+
         self.context_creator = context_function or EmptyAsyncContext
 
     def exists(self, task_id: str) -> bool:
@@ -256,5 +258,15 @@ class JobManager:
 
     async def wait_job(self, job_id: str) -> None:
         """Wait for a job."""
-        # TODO
-        pass
+
+        async def waiter():
+            await self.events[job_id].empty_event.wait()
+            self.events.pop(job_id)
+            self.empty_waiters.pop(job_id)
+
+        if job_id not in self.empty_waiters:
+            self.empty_waiters[job_id] = self.spawn(
+                waiter, [], job_id=f"empty_waiter:{job_id}"
+            )
+
+        await self.events[job_id].wait()
