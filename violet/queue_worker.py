@@ -33,9 +33,12 @@ async def acquire_jobs(manager, conn, queue, rows):
     return tasks
 
 
-async def release_tasks(conn, tasks: Dict[str, asyncio.Task]):
+async def release_tasks(manager, conn, tasks: Dict[str, asyncio.Task]):
     for job_id, task in tasks.items():
         assert task.done()
+
+        if job_id in manager.events:
+            manager.events[job_id].set()
 
         new_state = JobState.Completed
         new_error = ""
@@ -130,7 +133,7 @@ async def run_jobs(
 
     async with manager.db.acquire() as conn:
         async with conn.transaction():
-            await release_tasks(conn, tasks)
+            await release_tasks(manager, conn, tasks)
 
 
 async def queue_worker(manager, queue: Queue):

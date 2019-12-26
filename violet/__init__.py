@@ -6,5 +6,6 @@ __version__ = "0.1.0"
 
 from .manager import JobManager
 from .models import JobState, QueueJobContext
+from .event import JobEvent
 
-__all__ = ["JobManager", "JobState", "QueueJobContext"]
+__all__ = ["JobManager", "JobState", "QueueJobContext", "JobEvent"]

@@ -45,6 +45,8 @@ def main():
 
         loop.run_until_complete(creator(num))
 
+    final_job_id = to_watch[-1]
+
     async def watcher():
         while True:
             statuses = {}
@@ -60,7 +62,12 @@ def main():
 
             await asyncio.sleep(1)
 
+    async def signaler():
+        await sched.wait_job(final_job_id)
+        print("final job finished!!!")
+
     loop.create_task(watcher())
+    loop.create_task(signaler())
     loop.run_until_complete(asyncio.sleep(10))
 
 

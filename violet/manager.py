@@ -7,11 +7,13 @@ import uuid
 import asyncio
 import logging
 from typing import List, Any, Iterable, Dict, Optional
+from collections import defaultdict
 
 from .errors import TaskExistsError, QueueExistsError
 from .models import Queue, QueueJobStatus
 from .queue_worker import queue_worker, StopQueueWorker
 from .utils import execute_with_json, fetchrow_with_json
+from .event import JobEvent
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +37,8 @@ class JobManager:
         self.db = db
         self.tasks: Dict[str, asyncio.Task] = {}
         self.queues: Dict[str, Queue] = {}
+        self.events: Dict[str, JobEvent] = defaultdict(JobEvent)
+        self.empty_waiters: Dict[str, JobEvent] = defaultdict(JobEvent)
         self.context_creator = context_function or EmptyAsyncContext
 
     def exists(self, task_id: str) -> bool:
@@ -249,3 +253,8 @@ class JobManager:
 
         for task_id in list(self.tasks.keys()):
             self.stop(task_id)
+
+    async def wait_job(self, job_id: str) -> None:
+        """Wait for a job."""
+        # TODO
+        pass
