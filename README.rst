@@ -21,13 +21,12 @@ This library is:
 Usage
 --------
 
-Violet requires ::
+The simple subset of violet features can be described by
+.. code-block:: python
 
     from violet import JobManager
 
-    # it is the responsibility of the user to configure tables. violet will
-    # not do it for the user. at most, violet will generate table definitions
-    # to guide the user.
+    # it is the responsibility of the user to configure tables.
     sched = JobManager(db=loop.run_until_complete(asyncpg.create_pool(...)))
 
     async def function(a, b):
@@ -41,19 +40,20 @@ Violet requires ::
     # when the webapp is starting up)
     sched.spawn_periodic(function, [2, 2], period=5, job_id="my_function")
 
-    # will spawn function as a background job queue, which makes it resumable in
-    # the face of a crash.
-
     # the create_job_queue call should happen when starting up.
     sched.create_job_queue(
         "add",
         args=(int, int),
         handler=function,
-        max_concurrent_workers=5
+        takes=5,
+        period=1,
     )
 
     # and, to push data into the queue
-    await sched.push_queue("add", [1, 2])
+    job_id = await sched.push_queue("add", [1, 2])
+
+    # wait for the job to finish
+    await sched.wait_job(job_id)
 
 Install
 --------
