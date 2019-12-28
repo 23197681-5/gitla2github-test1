@@ -22,6 +22,7 @@ Usage
 --------
 
 The simple subset of violet features can be described by
+
 .. code-block:: python
 
     from violet import JobManager
