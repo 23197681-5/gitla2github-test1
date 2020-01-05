@@ -18,6 +18,6 @@ setup(
     license="LGPL-3.0",
     packages=["violet"],
     package_dir={"": "."},
-    package_data={"violet": "py.typed"},
+    package_data={"violet": ["py.typed"]},
     install_requires=["asyncpg==0.20.0"],
 )
