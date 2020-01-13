@@ -19,5 +19,5 @@ setup(
     packages=["violet"],
     package_dir={"": "."},
     package_data={"violet": ["py.typed"]},
-    install_requires=["asyncpg==0.20.0"],
+    install_requires=["asyncpg==0.20.1"],
 )
