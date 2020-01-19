@@ -7,6 +7,7 @@ import asyncio
 import traceback
 from typing import Dict
 
+from hail import Flake
 from .models import Queue, JobState, QueueJobContext
 from .utils import fetch_with_json
 
@@ -17,7 +18,7 @@ async def acquire_jobs(manager, conn, queue, rows):
     tasks: Dict[str, asyncio.Task] = {}
 
     for row in rows:
-        job_id = row["job_id"]
+        job_id = Flake.from_string(row["job_id"])
         ctx = QueueJobContext(manager, job_id, row["name"])
         task = manager.loop.create_task(queue.function(ctx, *row["args"]))
         tasks[job_id] = task
@@ -27,7 +28,7 @@ async def acquire_jobs(manager, conn, queue, rows):
             SET state = 1, taken_at = (now() at time zone 'utc')
             WHERE job_id = $1
             """,
-            job_id,
+            str(job_id),
         )
 
     return tasks
@@ -59,7 +60,7 @@ async def release_tasks(manager, conn, tasks: Dict[str, asyncio.Task]):
             """,
             new_state,
             new_error,
-            job_id,
+            str(job_id),
         )
 
 

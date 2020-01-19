@@ -7,6 +7,7 @@ import asyncio
 import datetime
 from typing import Iterable, Callable, Any, Awaitable, Optional
 from dataclasses import dataclass
+from hail import Flake
 
 
 @dataclass
@@ -42,5 +43,5 @@ class QueueJobStatus:
 class QueueJobContext:
     # TODO fix typing and recursive import that would happen for this maybe
     manager: Any
-    job_id: str
+    job_id: Flake
     name: str
