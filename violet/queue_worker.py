@@ -18,7 +18,7 @@ async def acquire_jobs(manager, conn, queue, rows):
 
     for row in rows:
         job_id = row["job_id"]
-        ctx = QueueJobContext(manager, job_id)
+        ctx = QueueJobContext(manager, job_id, row["name"])
         task = manager.loop.create_task(queue.function(ctx, *row["args"]))
         tasks[job_id] = task
         await conn.execute(
@@ -74,7 +74,7 @@ async def fetch_jobs(
     return await fetch_with_json(
         conn,
         f"""
-        SELECT job_id, args
+        SELECT job_id, name, args
         FROM violet_jobs
         WHERE
             queue = $1

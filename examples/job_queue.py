@@ -56,9 +56,9 @@ def main():
 
             for job_id, status in statuses.items():
                 if status.state == 3:
-                    logging.info("job %r error %r", job_id, status.errors)
+                    logging.error("job %r error %r", job_id, status.errors)
                 else:
-                    logging.error("job %r state %r", job_id, status.state)
+                    logging.info("job %r state %r", job_id, status.state)
 
             await asyncio.sleep(1)
 

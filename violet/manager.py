@@ -11,6 +11,7 @@ from typing import List, Any, Iterable, Dict, Optional
 from collections import defaultdict
 
 import hail
+from hail import Flake
 
 from .errors import TaskExistsError, QueueExistsError
 from .models import Queue, QueueJobStatus
@@ -85,9 +86,7 @@ class JobManager:
             # TODO failure modes for single tasks
             self._remove_task(task_id)
 
-    def spawn(
-        self, function, args: List[Any], *, job_id: str, **kwargs
-    ) -> asyncio.Task:
+    def spawn(self, function, args: List[Any], *, name: str, **kwargs) -> asyncio.Task:
         """Spawn the given function in the background.
 
         This is a wrapper around loop.create_task that gives you proper logging
@@ -98,11 +97,11 @@ class JobManager:
         """
 
         return self._create_task(
-            job_id, main_coroutine=self._wrapper(function, args, job_id, **kwargs)
+            name, main_coroutine=self._wrapper(function, args, name, **kwargs)
         )
 
     def spawn_periodic(
-        self, function, args: List[Any], *, period: int = 5, job_id: str, **kwargs
+        self, function, args: List[Any], *, period: int = 5, name: str, **kwargs
     ):
         """Spawn a function that ticks itself periodically every
         ``period`` seconds."""
@@ -113,7 +112,7 @@ class JobManager:
                 await asyncio.sleep(period)
 
         return self._create_task(
-            job_id, main_coroutine=self._wrapper(ticker_func, [], job_id, **kwargs)
+            name, main_coroutine=self._wrapper(ticker_func, [], name, **kwargs)
         )
 
     def create_job_queue(
@@ -158,12 +157,7 @@ class JobManager:
         self._create_queue_worker(self.queues[queue_id])
 
     async def push_queue(
-        self,
-        queue_name: str,
-        args: List[Any],
-        *,
-        job_id: Optional[str] = None,
-        **kwargs,
+        self, queue_name: str, args: List[Any], *, name: Optional[str] = None, **kwargs,
     ):
         """Push data to a job queue."""
 
@@ -174,19 +168,19 @@ class JobManager:
         log.debug("try push %r %r", queue_name, args)
         now = kwargs.get("scheduled_at") or datetime.datetime.utcnow()
 
-        primary_job_id = self.factory.get_flake()
-        secondary_job_id = job_id or uuid.uuid4().hex
+        job_id = self.factory.get_flake()
+        name = name or uuid.uuid4().hex
 
         await execute_with_json(
             self.db,
             """
             INSERT INTO violet_jobs
-                (primary_job_id, secondary_job_id, queue, args, scheduled_at)
+                (job_id, name, queue, args, scheduled_at)
             VALUES
                 ($1, $2, $3, $4, $5)
             """,
-            str(primary_job_id),
-            secondary_job_id,
+            str(job_id),
+            name,
             queue_name,
             args,
             now,
@@ -199,7 +193,7 @@ class JobManager:
 
         return job_id
 
-    async def fetch_queue_job_status(self, job_id: str) -> QueueJobStatus:
+    async def fetch_queue_job_status(self, job_id: Flake) -> QueueJobStatus:
         row = await fetchrow_with_json(
             self.db,
             """
@@ -209,12 +203,12 @@ class JobManager:
             WHERE
                 job_id = $1
             """,
-            job_id,
+            str(job_id),
         )
 
         return QueueJobStatus(*row)
 
-    async def set_job_state(self, job_id: str, state: Dict[Any, Any]) -> None:
+    async def set_job_state(self, job_id: Flake, state: Dict[Any, Any]) -> None:
         await execute_with_json(
             self.db,
             """
@@ -224,10 +218,10 @@ class JobManager:
                 job_id = $2
             """,
             state,
-            job_id,
+            str(job_id),
         )
 
-    async def fetch_job_state(self, job_id: str) -> Optional[Dict[Any, Any]]:
+    async def fetch_job_state(self, job_id: Flake) -> Optional[Dict[Any, Any]]:
         row = await fetchrow_with_json(
             self.db,
             """
@@ -236,7 +230,7 @@ class JobManager:
             WHERE
                 job_id = $1
             """,
-            job_id,
+            str(job_id),
         )
 
         return row["state"] if row is not None else None
@@ -269,7 +263,7 @@ class JobManager:
         for task_id in list(self.tasks.keys()):
             self.stop(task_id)
 
-    async def wait_job(self, job_id: str) -> None:
+    async def wait_job(self, job_id: Flake) -> None:
         """Wait for a job."""
 
         async def waiter():
@@ -279,7 +273,7 @@ class JobManager:
 
         if job_id not in self.empty_waiters:
             self.empty_waiters[job_id] = self.spawn(
-                waiter, [], job_id=f"empty_waiter:{job_id}"
+                waiter, [], name=f"empty_waiter:{job_id}"
             )
 
         await self.events[job_id].wait()

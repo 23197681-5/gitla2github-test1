@@ -43,3 +43,4 @@ class QueueJobContext:
     # TODO fix typing and recursive import that would happen for this maybe
     manager: Any
     job_id: str
+    name: str
