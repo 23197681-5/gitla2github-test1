@@ -10,8 +10,7 @@ import random
 from typing import List, Any, Iterable, Dict, Optional
 from collections import defaultdict
 
-import hail
-from hail import Flake
+from hail import Flake, FlakeFactory
 
 from .errors import TaskExistsError, QueueExistsError
 from .models import Queue, QueueJobStatus
@@ -48,7 +47,7 @@ class JobManager:
         self.db = db
         self.tasks: Dict[str, asyncio.Task] = {}
         self.queues: Dict[str, Queue] = {}
-        self.factory = hail.FlakeFactory(node_id or random.randint(0, 65535))
+        self.factory = FlakeFactory(node_id or random.randint(0, 65535))
 
         self.events: Dict[str, JobEvent] = defaultdict(JobEvent)
         self.empty_waiters: Dict[str, asyncio.Task] = {}
@@ -56,10 +55,7 @@ class JobManager:
         self.context_creator = context_function or EmptyAsyncContext
 
     def exists(self, task_id: str) -> bool:
-        """Return if a given task exists in the current running tasks.
-
-        TODO stable task ids for queue workers?
-        """
+        """Return if a given task exists in the current running task list."""
         return task_id in self.tasks
 
     def _create_task(self, task_id: str, *, main_coroutine):
