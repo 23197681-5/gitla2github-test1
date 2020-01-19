@@ -6,8 +6,11 @@ import datetime
 import uuid
 import asyncio
 import logging
+import random
 from typing import List, Any, Iterable, Dict, Optional
 from collections import defaultdict
+
+import hail
 
 from .errors import TaskExistsError, QueueExistsError
 from .models import Queue, QueueJobStatus
@@ -32,11 +35,19 @@ class EmptyAsyncContext:
 class JobManager:
     """Manage background jobs."""
 
-    def __init__(self, *, loop=None, db=None, context_function=None):
+    def __init__(
+        self,
+        *,
+        loop=None,
+        db=None,
+        context_function=None,
+        node_id: Optional[int] = None,
+    ):
         self.loop = loop or asyncio.get_event_loop()
         self.db = db
         self.tasks: Dict[str, asyncio.Task] = {}
         self.queues: Dict[str, Queue] = {}
+        self.factory = hail.FlakeFactory(node_id or random.randint(0, 65535))
 
         self.events: Dict[str, JobEvent] = defaultdict(JobEvent)
         self.empty_waiters: Dict[str, asyncio.Task] = {}
@@ -161,19 +172,21 @@ class JobManager:
             raise ValueError(f"Queue {queue_name} does not exist")
 
         log.debug("try push %r %r", queue_name, args)
-        job_id = job_id or uuid.uuid4().hex
-
         now = kwargs.get("scheduled_at") or datetime.datetime.utcnow()
+
+        primary_job_id = self.factory.get_flake()
+        secondary_job_id = job_id or uuid.uuid4().hex
 
         await execute_with_json(
             self.db,
             """
             INSERT INTO violet_jobs
-                (job_id, queue, args, scheduled_at)
+                (primary_job_id, secondary_job_id, queue, args, scheduled_at)
             VALUES
-                ($1, $2, $3, $4)
+                ($1, $2, $3, $4, $5)
             """,
-            job_id,
+            str(primary_job_id),
+            secondary_job_id,
             queue_name,
             args,
             now,
