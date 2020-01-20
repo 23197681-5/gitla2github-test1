@@ -1,3 +1,11 @@
+# 0.2.1
+
+```sql
+DROP TABLE violet_jobs
+```
+
+another experiment. trying to use job\_id as UUID for proper ordering.
+
 # 0.2.0
 
 if you still want to maintain `violet_jobs` intact right now:
