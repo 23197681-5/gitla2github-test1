@@ -7,7 +7,7 @@ import uuid
 import asyncio
 import logging
 import random
-from typing import List, Any, Iterable, Dict, Optional
+from typing import List, Any, Iterable, Dict, Optional, Union
 from collections import defaultdict
 
 from hail import Flake, FlakeFactory
@@ -154,7 +154,7 @@ class JobManager:
 
     async def push_queue(
         self, queue_name: str, args: List[Any], *, name: Optional[str] = None, **kwargs,
-    ):
+    ) -> Flake:
         """Push data to a job queue."""
 
         # ensure queue was declared
@@ -189,7 +189,7 @@ class JobManager:
 
         return job_id
 
-    async def fetch_queue_job_status(self, job_id: Flake) -> QueueJobStatus:
+    async def fetch_queue_job_status(self, job_id: Union[str, Flake]) -> QueueJobStatus:
         row = await fetchrow_with_json(
             self.db,
             """
@@ -204,7 +204,9 @@ class JobManager:
 
         return QueueJobStatus(*row)
 
-    async def set_job_state(self, job_id: Flake, state: Dict[Any, Any]) -> None:
+    async def set_job_state(
+        self, job_id: Union[str, Flake], state: Dict[Any, Any]
+    ) -> None:
         await execute_with_json(
             self.db,
             """
@@ -217,7 +219,9 @@ class JobManager:
             str(job_id),
         )
 
-    async def fetch_job_state(self, job_id: Flake) -> Optional[Dict[Any, Any]]:
+    async def fetch_job_state(
+        self, job_id: Union[str, Flake]
+    ) -> Optional[Dict[Any, Any]]:
         row = await fetchrow_with_json(
             self.db,
             """
@@ -259,8 +263,10 @@ class JobManager:
         for task_id in list(self.tasks.keys()):
             self.stop(task_id)
 
-    async def wait_job(self, job_id: Flake) -> None:
+    async def wait_job(self, any_job_id: Union[str, Flake]) -> None:
         """Wait for a job."""
+
+        job_id = str(any_job_id)
 
         async def waiter():
             await self.events[job_id].empty_event.wait()

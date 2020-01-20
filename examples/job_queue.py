@@ -41,7 +41,7 @@ def main():
         async def creator(num):
             job_id = await sched.push_queue("my_queue", [num, num])
             to_watch.append(job_id)
-            logging.info("created queue job %r with args %r", job_id, [num, num])
+            logging.info("created queue job %s with args %r", job_id, [num, num])
 
         loop.run_until_complete(creator(num))
 
@@ -56,9 +56,9 @@ def main():
 
             for job_id, status in statuses.items():
                 if status.state == 3:
-                    logging.error("job %r error %r", job_id, status.errors)
+                    logging.error("job %s error %r", job_id, status.errors)
                 else:
-                    logging.info("job %r state %r", job_id, status.state)
+                    logging.info("job %s state %r", job_id, status.state)
 
             await asyncio.sleep(1)
 

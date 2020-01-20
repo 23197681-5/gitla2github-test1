@@ -18,10 +18,10 @@ async def acquire_jobs(manager, conn, queue, rows):
     tasks: Dict[str, asyncio.Task] = {}
 
     for row in rows:
-        job_id = Flake.from_string(row["job_id"])
+        job_id: Flake = Flake.from_string(row["job_id"])
         ctx = QueueJobContext(manager, job_id, row["name"])
         task = manager.loop.create_task(queue.function(ctx, *row["args"]))
-        tasks[job_id] = task
+        tasks[str(job_id)] = task
         await conn.execute(
             """
             UPDATE violet_jobs
@@ -60,7 +60,7 @@ async def release_tasks(manager, conn, tasks: Dict[str, asyncio.Task]):
             """,
             new_state,
             new_error,
-            str(job_id),
+            job_id,
         )
 
 
