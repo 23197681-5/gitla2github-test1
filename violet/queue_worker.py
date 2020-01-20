@@ -18,7 +18,7 @@ async def acquire_jobs(manager, conn, queue, rows):
     tasks: Dict[str, asyncio.Task] = {}
 
     for row in rows:
-        job_id: Flake = Flake.from_string(row["job_id"])
+        job_id: Flake = Flake.from_uuid(row["job_id"])
         ctx = QueueJobContext(manager, job_id, row["name"])
         task = manager.loop.create_task(queue.function(ctx, *row["args"]))
         tasks[str(job_id)] = task

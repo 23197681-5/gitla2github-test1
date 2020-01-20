@@ -1,6 +1,6 @@
 create table if not exists violet_jobs (
-    job_id text primary key,
-    name text UNIQUE,
+    job_id uuid primary key,
+    name text unique,
 
     queue text default null,
     state bigint default 0,
