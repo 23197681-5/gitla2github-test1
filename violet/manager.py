@@ -97,7 +97,7 @@ class JobManager:
         )
 
     def spawn_periodic(
-        self, function, args: List[Any], *, period: int = 5, name: str, **kwargs
+        self, function, args: List[Any], *, period: float = 5, name: str, **kwargs
     ):
         """Spawn a function that ticks itself periodically every
         ``period`` seconds."""
@@ -118,7 +118,7 @@ class JobManager:
         args: Iterable[type],
         handler,
         takes: int = 5,
-        period: int = 1,
+        period: float = 1,
         start_existing_jobs: bool = True,
     ):
         """Create a job queue.

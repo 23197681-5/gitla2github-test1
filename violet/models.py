@@ -16,7 +16,7 @@ class Queue:
     args: Iterable[type]
     function: Callable[..., Awaitable[Any]]
     takes: int
-    period: int
+    period: float
     start_existing_jobs: bool
 
     task: Optional[asyncio.Task] = None
