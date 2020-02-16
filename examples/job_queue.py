@@ -9,6 +9,7 @@ from violet import JobManager
 
 async def my_function(ctx, a, b):
     print(a + b)
+    await asyncio.sleep(0.5)
     await ctx.manager.set_job_state(ctx.job_id, {"note": "awoo"})
     state = await ctx.manager.fetch_job_state(ctx.job_id)
     assert state["note"] == "awoo"
@@ -63,6 +64,9 @@ def main():
             await asyncio.sleep(1)
 
     async def signaler():
+        await sched.wait_job_start(final_job_id)
+        print("final job is at work!!")
+
         await sched.wait_job(final_job_id)
         print("final job finished!!!")
 
