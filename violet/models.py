@@ -44,5 +44,17 @@ class QueueJobStatus:
 class QueueJobContext:
     # TODO fix typing and recursive import that would happen for this maybe
     manager: Any
+    queue: Queue
     job_id: Flake
     name: str
+
+    def set_start(self):
+        """Set the start event on the job. Raises RuntimeError if the queue
+        is not configured for custom start events."""
+        job_id_str = str(self.job_id)
+
+        if not self.queue.custom_start_event:
+            raise RuntimeError("Queue isn't configured for custom start events")
+
+        if job_id_str in self.manager.start_events:
+            self.manager.start_events[job_id_str].set()

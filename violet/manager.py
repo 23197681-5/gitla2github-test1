@@ -291,7 +291,18 @@ class JobManager:
         await self.events[job_id].wait()
 
     async def wait_job_start(self, any_job_id: Union[str, Flake]) -> None:
-        """Wait for a job to start."""
+        """Wait for a job to start.
+
+        Start can be defined by:
+         - When the queue worker acquires the jobs
+         - When the queue handler signals it's start
+
+        That is a queue setting.
+
+        It is recommended for queues to signal themselves as custom,
+        if they have any state to setup, or else, users of this function
+        might get completely empty state.
+        """
 
         job_id = str(any_job_id)
 
