@@ -290,7 +290,7 @@ class JobManager:
 
         async def waiter():
             await self.start_events[job_id].empty_event.wait()
-            self.events.pop(job_id)
+            self.start_events.pop(job_id)
             self.empty_start_waiters.pop(job_id)
 
         if job_id not in self.empty_start_waiters:
