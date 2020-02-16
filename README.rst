@@ -53,6 +53,9 @@ The simple subset of violet features can be described by
     # and, to push data into the queue
     job_id = await sched.push_queue("add", [1, 2])
 
+    # wait for the job to start
+    await sched.wait_job_start(job_id)
+
     # wait for the job to finish
     await sched.wait_job(job_id)
 
