@@ -18,6 +18,7 @@ class Queue:
     takes: int
     period: float
     start_existing_jobs: bool
+    custom_start_event: bool
 
     task: Optional[asyncio.Task] = None
 

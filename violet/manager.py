@@ -123,6 +123,7 @@ class JobManager:
         takes: int = 5,
         period: float = 1,
         start_existing_jobs: bool = True,
+        custom_start_event: bool = False,
     ):
         """Create a job queue.
 
@@ -133,7 +134,13 @@ class JobManager:
             raise QueueExistsError()
 
         self.queues[queue_name] = Queue(
-            queue_name, args, handler, takes, period, start_existing_jobs
+            queue_name,
+            args,
+            handler,
+            takes,
+            period,
+            start_existing_jobs,
+            custom_start_event,
         )
 
     def _create_queue_worker(self, queue: Queue):
