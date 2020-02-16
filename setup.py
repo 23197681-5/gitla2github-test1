@@ -10,7 +10,7 @@ readme = ""
 setup(
     long_description=readme,
     name="violet",
-    version="0.2.2",
+    version="0.2.3",
     description="An asyncio background job library",
     python_requires="==3.*,>=3.7.0",
     author="elixi.re",

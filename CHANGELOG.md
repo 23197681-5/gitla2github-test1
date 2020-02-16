@@ -1,3 +1,9 @@
+# 0.2.3
+
+ - add custom start events
+    - so that jobs can do state initialization THEN signal everyone waiting
+      on them
+
 # 0.2.2
 
  - add JobManager.wait_job_start
