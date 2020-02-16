@@ -10,6 +10,7 @@ from violet import JobManager
 async def my_function(ctx, a, b):
     print(a + b)
     await asyncio.sleep(0.5)
+    ctx.set_start()
     await ctx.manager.set_job_state(ctx.job_id, {"note": "awoo"})
     state = await ctx.manager.fetch_job_state(ctx.job_id)
     assert state["note"] == "awoo"
@@ -32,7 +33,12 @@ def main():
         ),
     )
     sched.create_job_queue(
-        "my_queue", args=(int, int), handler=my_function, takes=2, period=1
+        "my_queue",
+        args=(int, int),
+        handler=my_function,
+        takes=2,
+        period=1,
+        custom_start_event=True,
     )
 
     to_watch: List[str] = []
