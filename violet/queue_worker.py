@@ -19,6 +19,10 @@ async def acquire_jobs(manager, conn, queue, rows):
 
     for row in rows:
         job_id: Flake = Flake.from_uuid(row["job_id"])
+
+        if job_id in manager.start_events:
+            manager.start_events[job_id].set()
+
         ctx = QueueJobContext(manager, job_id, row["name"])
         task = manager.loop.create_task(queue.function(ctx, *row["args"]))
         tasks[str(job_id)] = task
