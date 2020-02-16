@@ -50,7 +50,10 @@ class JobManager:
         self.factory = FlakeFactory(node_id or random.randint(0, 65535))
 
         self.events: Dict[str, JobEvent] = defaultdict(JobEvent)
+        self.start_events: Dict[str, JobEvent] = defaultdict(JobEvent)
+
         self.empty_waiters: Dict[str, asyncio.Task] = {}
+        self.empty_start_waiters: Dict[str, asyncio.Task] = {}
 
         self.context_creator = context_function or EmptyAsyncContext
 
@@ -279,3 +282,20 @@ class JobManager:
             )
 
         await self.events[job_id].wait()
+
+    async def wait_job_start(self, any_job_id: Union[str, Flake]) -> None:
+        """Wait for a job to start."""
+
+        job_id = str(any_job_id)
+
+        async def waiter():
+            await self.start_events[job_id].empty_event.wait()
+            self.events.pop(job_id)
+            self.empty_start_waiters.pop(job_id)
+
+        if job_id not in self.empty_start_waiters:
+            self.empty_start_waiters[job_id] = self.spawn(
+                waiter, [], name=f"empty_start_waiter:{job_id}"
+            )
+
+        await self.start_events[job_id].wait()
