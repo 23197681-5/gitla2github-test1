@@ -1,3 +1,7 @@
+# 0.2.2
+
+ - add JobManager.wait_job_start
+
 # 0.2.1
 
 ```sql
