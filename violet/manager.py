@@ -79,8 +79,12 @@ class JobManager:
                 await function(*args)
         except asyncio.CancelledError:
             log.debug("task %r cancelled", task_id)
-        except Exception:
+        except Exception as err:
+            fail_mode = kwargs.get("fail_mode")
             log.exception("error at task %r", task_id)
+
+            if fail_mode == "raise_error":
+                raise err
         finally:
             # TODO failure modes for single tasks
             self._remove_task(task_id)
