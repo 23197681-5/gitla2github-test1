@@ -5,9 +5,35 @@
 import enum
 import asyncio
 import datetime
-from typing import Iterable, Callable, Any, Awaitable, Optional
+
+from typing import (
+    Iterable,
+    Callable,
+    Any,
+    Awaitable,
+    Optional,
+)
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
 from hail import Flake
+
+
+@dataclass
+class JobDetails:
+    """Represents the details of any given job."""
+
+    id: Flake
+    # function: Callable[..., Any]
+    # args: Iterable[Any]
+
+
+class FailMode(ABC):
+    """Base class for failure modes."""
+
+    @abstractmethod
+    async def handle(self, job: JobDetails, exception: Exception, state: dict) -> bool:
+        ...
 
 
 @dataclass
@@ -19,6 +45,7 @@ class Queue:
     period: float
     start_existing_jobs: bool
     custom_start_event: bool
+    fail_mode: FailMode
 
     task: Optional[asyncio.Task] = None
 

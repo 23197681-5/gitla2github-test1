@@ -8,19 +8,35 @@ import traceback
 from typing import Dict
 
 from hail import Flake
-from .models import Queue, JobState, QueueJobContext
+from .models import Queue, JobState, QueueJobContext, JobDetails
 from .utils import fetch_with_json
 
 log = logging.getLogger(__name__)
 
 
+async def _queue_function_wrapper(queue, ctx, args, state=None):
+    try:
+        await queue.function(ctx, *args)
+    except Exception as exc:
+        state = state or {}
+        retry = await queue.fail_mode.handle(JobDetails(ctx.job_id), exc, state)
+        if retry:
+            return await _queue_function_wrapper(queue, ctx, args, state=state)
+
+
 async def acquire_jobs(manager, conn, queue, rows):
+    """Acquire the jobs, create tasks for each job, and set their state to 1.
+
+    Returns a dictionary containing the spawned tasks.
+    """
     tasks: Dict[str, asyncio.Task] = {}
 
     for row in rows:
         job_id: Flake = Flake.from_uuid(row["job_id"])
         ctx = QueueJobContext(manager, queue, job_id, row["name"])
-        task = manager.loop.create_task(queue.function(ctx, *row["args"]))
+        task = manager.loop.create_task(
+            _queue_function_wrapper(queue, ctx, row["args"])
+        )
         tasks[str(job_id)] = task
         await conn.execute(
             """
@@ -39,6 +55,7 @@ async def acquire_jobs(manager, conn, queue, rows):
 
 
 async def release_tasks(manager, conn, tasks: Dict[str, asyncio.Task]):
+    """Release the given tasks, setting their state to Completed or Error."""
     for job_id, task in tasks.items():
         assert task.done()
 
@@ -133,6 +150,7 @@ async def run_jobs(
         else:
             return
 
+    # wait for all the tasks to run.
     done, pending = await asyncio.wait(tasks.values())
     assert not pending
 
