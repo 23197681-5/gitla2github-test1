@@ -12,11 +12,12 @@ from collections import defaultdict
 
 from hail import Flake, FlakeFactory
 
-from .errors import TaskExistsError, QueueExistsError
-from .models import Queue, QueueJobStatus
-from .queue_worker import queue_worker, StopQueueWorker
-from .utils import execute_with_json, fetchrow_with_json
-from .event import JobEvent
+from violet.errors import TaskExistsError, QueueExistsError
+from violet.models import Queue, QueueJobStatus, JobDetails
+from violet.queue_worker import queue_worker, StopQueueWorker
+from violet.utils import execute_with_json, fetchrow_with_json
+from violet.event import JobEvent
+from violet.fail_modes import FailMode, LogOnly, RaiseErr
 
 log = logging.getLogger(__name__)
 
@@ -79,12 +80,21 @@ class JobManager:
                 await function(*args)
         except asyncio.CancelledError:
             log.debug("task %r cancelled", task_id)
-        except Exception as err:
-            fail_mode = kwargs.get("fail_mode")
-            log.exception("error at task %r", task_id)
+        except Exception as exc:
+            fail_mode: FailMode = kwargs.get("fail_mode") or LogOnly()
 
-            if fail_mode == "raise_error":
-                raise err
+            # state here serves as a way for failure modes to be fully
+            # contained. the instantiation of a failure mode only declares
+            # its configuration, its behavior becomes completely separate
+            # inside the auto-genned state dict.
+            state = kwargs.get("_wrapper_state") or {}
+            retry = await fail_mode.handle(JobDetails(task_id), exc, state)
+
+            if retry:
+                # we need to share state for this job in some way and this is
+                # the best way i found while developing.
+                kwargs["_wrapper_state"] = state
+                return await self._wrapper(function, args, task_id, **kwargs)
         finally:
             # TODO failure modes for single tasks
             self._remove_task(task_id)
@@ -128,12 +138,15 @@ class JobManager:
         period: float = 1,
         start_existing_jobs: bool = True,
         custom_start_event: bool = False,
+        fail_mode: Optional[FailMode] = None,
     ):
         """Create a job queue.
 
         The job queue MUST be declared at the start of the application so
         recovery can happen by then.
         """
+        fail_mode = fail_mode or RaiseErr(log_error=False)
+
         if queue_name in self.queues:
             raise QueueExistsError()
 
@@ -145,6 +158,7 @@ class JobManager:
             period,
             start_existing_jobs,
             custom_start_event,
+            fail_mode,
         )
 
     def _create_queue_worker(self, queue: Queue):
