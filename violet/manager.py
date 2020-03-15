@@ -291,24 +291,26 @@ class JobManager:
         for task_id in list(self.tasks.keys()):
             self.stop(task_id)
 
-    async def wait_job(self, any_job_id: Union[str, Flake]) -> None:
+    async def wait_job(self, any_job_id: Union[str, Flake], *, timeout=None) -> None:
         """Wait for a job."""
 
         job_id = str(any_job_id)
 
-        async def waiter():
+        async def empty_waiter():
             await self.events[job_id].empty_event.wait()
             self.events.pop(job_id)
             self.empty_waiters.pop(job_id)
 
         if job_id not in self.empty_waiters:
             self.empty_waiters[job_id] = self.spawn(
-                waiter, [], name=f"empty_waiter:{job_id}"
+                empty_waiter, [], name=f"empty_waiter:{job_id}"
             )
 
-        await self.events[job_id].wait()
+        await asyncio.wait_for(self.events[job_id].wait(), timeout)
 
-    async def wait_job_start(self, any_job_id: Union[str, Flake]) -> None:
+    async def wait_job_start(
+        self, any_job_id: Union[str, Flake], *, timeout=None
+    ) -> None:
         """Wait for a job to start.
 
         Start can be defined by:
@@ -334,4 +336,4 @@ class JobManager:
                 waiter, [], name=f"empty_start_waiter:{job_id}"
             )
 
-        await self.start_events[job_id].wait()
+        await asyncio.wait_for(self.start_events[job_id].wait(), timeout)

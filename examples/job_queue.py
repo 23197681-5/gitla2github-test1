@@ -69,6 +69,18 @@ def main():
 
             await asyncio.sleep(1)
 
+    async def test_final_timeout_fail():
+        try:
+            await sched.wait_job(final_job_id, timeout=3)
+        except asyncio.TimeoutError:
+            print("======TEST TIMEOUT")
+
+    async def test_start_timeout_fail():
+        try:
+            await sched.wait_job_start(final_job_id, timeout=4)
+        except asyncio.TimeoutError:
+            print("======TEST START TIMEOUT")
+
     async def signaler():
         await sched.wait_job_start(final_job_id)
         print("final job is at work!!")
@@ -78,6 +90,8 @@ def main():
 
     loop.create_task(watcher())
     loop.create_task(signaler())
+    loop.create_task(test_final_timeout_fail())
+    loop.create_task(test_start_timeout_fail())
     loop.run_until_complete(asyncio.sleep(10))
 
 
