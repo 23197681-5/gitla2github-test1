@@ -36,9 +36,8 @@ def main():
         "my_queue",
         args=(int, int),
         handler=my_function,
-        takes=2,
-        period=1,
         custom_start_event=True,
+        workers=2,
     )
 
     to_watch: List[str] = []
@@ -59,6 +58,7 @@ def main():
             statuses = {}
             for job_id in to_watch:
                 status = await sched.fetch_queue_job_status(job_id)
+                assert status is not None
                 statuses[job_id] = status
 
             for job_id, status in statuses.items():
@@ -92,7 +92,11 @@ def main():
     loop.create_task(signaler())
     loop.create_task(test_final_timeout_fail())
     loop.create_task(test_start_timeout_fail())
-    loop.run_until_complete(asyncio.sleep(10))
+    try:
+        loop.run_until_complete(asyncio.sleep(10))
+    except KeyboardInterrupt:
+        sched.stop_all()
+        loop.run_until_complete(asyncio.sleep(2))
 
 
 if __name__ == "__main__":
