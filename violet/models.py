@@ -41,13 +41,11 @@ class Queue:
     name: str
     args: Iterable[type]
     function: Callable[..., Awaitable[Any]]
-    takes: int
-    period: float
     start_existing_jobs: bool
     custom_start_event: bool
     fail_mode: FailMode
-
-    task: Optional[asyncio.Task] = None
+    asyncio_queue: asyncio.Queue
+    poller_takes: int
 
 
 class JobState(enum.IntEnum):

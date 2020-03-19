@@ -7,14 +7,14 @@ import uuid
 import asyncio
 import logging
 import random
-from typing import List, Any, Iterable, Dict, Optional, Union
+from typing import List, Any, Iterable, Dict, Optional, Union, Callable, Set
 from collections import defaultdict
 
 from hail import Flake, FlakeFactory
 
 from violet.errors import TaskExistsError, QueueExistsError
 from violet.models import Queue, QueueJobStatus, JobDetails
-from violet.queue_worker import queue_worker, StopQueueWorker
+from violet.queue_worker import queue_worker, queue_poller
 from violet.utils import execute_with_json, fetchrow_with_json
 from violet.event import JobEvent
 from violet.fail_modes import FailMode, LogOnly, RaiseErr
@@ -57,6 +57,7 @@ class JobManager:
         self.empty_start_waiters: Dict[str, asyncio.Task] = {}
 
         self.context_creator = context_function or EmptyAsyncContext
+        self._poller_sets: Dict[str, Set[str]] = defaultdict(set)
 
     def exists(self, task_id: str) -> bool:
         """Return if a given task exists in the current running task list."""
@@ -130,67 +131,97 @@ class JobManager:
 
     def create_job_queue(
         self,
-        queue_name,
+        queue_name: str,
         *,
         args: Iterable[type],
-        handler,
-        takes: int = 5,
-        period: float = 1,
+        handler: Callable[..., Any],
+        workers: int = 1,
         start_existing_jobs: bool = True,
         custom_start_event: bool = False,
         fail_mode: Optional[FailMode] = None,
+        poller_takes: int = 1,
     ):
         """Create a job queue.
 
         The job queue MUST be declared at the start of the application so
-        recovery can happen by then.
+        job recovery can happen as soon as possible. It is also required to
+        declare the queue before any queue operations, as they won't know about
+        the queue.
+
+        To enhance the concurrency of the queue on high error rates, the first
+        consideration is fixing the error first, and the second, is to raise
+        the ``workers`` count. It is not recommended to raise it to very
+        high levels, as there will be a lot of clashing as workers try to lock
+        the same job multiple times.
+
+        Users of violet can wait for specific events of a job (currently, start
+        and end). While the end event is static and is always called, the
+        start event can be customized and set in a different point in time
+        inside the job itself (instead of it being at lock time). This might
+        be interesting for users that want to have a jobs' state setup after
+        they hear about the job start. Set ``custom_start_event`` to enable
+        this functionality.
+
+        While creating a job queue, a single worker, called the "poller", is
+        spawned. The poller checks every second for any outstanding jobs
+        to run at its current point in time. An outstanding job is a job that
+        was scheduled in the future, but should be run right now.
+
+        ``poller_takes`` sets the maximum amount of jobs that will be
+        taken by the poller and be inserted into the job queue.
         """
-        fail_mode = fail_mode or RaiseErr(log_error=False)
+        fail_mode = fail_mode or RaiseErr(log_error=True)
 
         if queue_name in self.queues:
             raise QueueExistsError()
 
-        self.queues[queue_name] = Queue(
+        queue = Queue(
             queue_name,
             args,
             handler,
-            takes,
-            period,
             start_existing_jobs,
             custom_start_event,
             fail_mode,
+            asyncio.Queue(),
+            poller_takes,
         )
 
-    def _create_queue_worker(self, queue: Queue):
-        async def _wrapper():
-            try:
-                async with self.context_creator():
-                    await queue_worker(self, queue)
-            except StopQueueWorker:
-                pass
-            except asyncio.CancelledError:
-                log.debug("queue worker for %r cancelled", queue.name)
-            except Exception:
-                log.exception("Queue worker for queue %r failed", queue.name)
-            finally:
-                queue.task = None
+        self.queues[queue_name] = queue
 
-        queue.task = self.loop.create_task(_wrapper())
+        # TODO create the resumer task (fetch existing jobs on Taken state
+        # and send them to asyncio_queue)
 
-    def create_queue_worker(self, queue_id: str):
-        self._create_queue_worker(self.queues[queue_id])
+        self.spawn(queue_poller, [self, queue], name=f"queue_poller_{queue_name}")
+
+        for worker_id in range(workers):
+            self.spawn(
+                self._queue_worker_wrapper,
+                [queue, worker_id],
+                name=f"queue_worker_{queue.name}_{worker_id}",
+            )
+
+    async def _queue_worker_wrapper(self, queue: Queue, worker_id: int):
+        try:
+            async with self.context_creator():
+                await queue_worker(self, queue, worker_id)
+
+        except asyncio.CancelledError:
+            log.debug("queue worker for %r cancelled", queue.name)
+        except Exception:
+            log.exception("Queue worker for queue %r failed", queue.name)
 
     async def push_queue(
         self, queue_name: str, args: List[Any], *, name: Optional[str] = None, **kwargs,
     ) -> Flake:
         """Push data to a job queue."""
 
-        # ensure queue was declared
-        if queue_name not in self.queues:
+        try:
+            queue = self.queues[queue_name]
+        except KeyError:
             raise ValueError(f"Queue {queue_name} does not exist")
 
         log.debug("try push %r %r", queue_name, args)
-        now = kwargs.get("scheduled_at") or datetime.datetime.utcnow()
+        scheduled_at = kwargs.get("scheduled_at") or datetime.datetime.utcnow()
 
         job_id = self.factory.get_flake()
         name = name or uuid.uuid4().hex
@@ -207,17 +238,22 @@ class JobManager:
             name,
             queue_name,
             args,
-            now,
+            scheduled_at,
         )
         log.debug("pushed %r %r", queue_name, args)
 
-        queue = self.queues[queue_name]
-        if queue.task is None:
-            self._create_queue_worker(queue)
+        # only dispatch to asyncio queue if it is actually meant to be now.
+        # TODO: a better heuristic would be getting the timedelta between
+        # given scheduled_at and dispatching to the queue if it is less than
+        # 1 second, but this already does the job.
+        if not kwargs.get("scheduled_at"):
+            queue.asyncio_queue.put_nowait(job_id)
 
         return job_id
 
-    async def fetch_queue_job_status(self, job_id: Union[str, Flake]) -> QueueJobStatus:
+    async def fetch_queue_job_status(
+        self, job_id: Union[str, Flake]
+    ) -> Optional[QueueJobStatus]:
         row = await fetchrow_with_json(
             self.db,
             """
@@ -229,6 +265,9 @@ class JobManager:
             """,
             str(job_id),
         )
+
+        if row is None:
+            return None
 
         return QueueJobStatus(*row)
 
@@ -292,7 +331,7 @@ class JobManager:
             self.stop(task_id)
 
     async def wait_job(self, any_job_id: Union[str, Flake], *, timeout=None) -> None:
-        """Wait for a job."""
+        """Wait for a job to complete."""
 
         job_id = str(any_job_id)
 

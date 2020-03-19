@@ -5,17 +5,23 @@
 import logging
 import asyncio
 import traceback
-from typing import Dict
+from typing import Set
 
 from hail import Flake
 from .models import Queue, JobState, QueueJobContext, JobDetails
-from .utils import fetch_with_json
+from .utils import fetch_with_json, pg_set_json, fetchrow_with_json
 
 log = logging.getLogger(__name__)
 
 
 async def _queue_function_wrapper(queue, ctx, args, state=None):
+    """Wrapper for the queue function call.
+
+    This wrapper locally manages the declared fail mode of the queue.
+
+    """
     try:
+        log.debug("job %s calling with args %r", ctx.job_id, args)
         await queue.function(ctx, *args)
     except Exception as exc:
         state = state or {}
@@ -24,70 +30,50 @@ async def _queue_function_wrapper(queue, ctx, args, state=None):
             return await _queue_function_wrapper(queue, ctx, args, state=state)
 
 
-async def acquire_jobs(manager, conn, queue, rows):
-    """Acquire the jobs, create tasks for each job, and set their state to 1.
+async def release_job(manager, conn, task: asyncio.Task, job_id: str):
+    """Release a single job. Fetches the result from it and
+    updates the table."""
+    assert task.done()
 
-    Returns a dictionary containing the spawned tasks.
-    """
-    tasks: Dict[str, asyncio.Task] = {}
+    if job_id in manager.events:
+        manager.events[job_id].set()
 
-    for row in rows:
-        job_id: Flake = Flake.from_uuid(row["job_id"])
-        ctx = QueueJobContext(manager, queue, job_id, row["name"])
-        task = manager.loop.create_task(
-            _queue_function_wrapper(queue, ctx, row["args"])
-        )
-        tasks[str(job_id)] = task
-        await conn.execute(
-            """
-            UPDATE violet_jobs
-            SET state = 1, taken_at = (now() at time zone 'utc')
-            WHERE job_id = $1
-            """,
-            str(job_id),
-        )
+    new_state = JobState.Completed
+    new_error = ""
 
-        job_id_str = str(job_id)
-        if not queue.custom_start_event and job_id_str in manager.start_events:
-            manager.start_events[job_id_str].set()
+    try:
+        task.result()
+    except Exception:
+        new_state = JobState.Error
+        new_error = traceback.format_exc()
+        log.error("error on job %r, '%s'", job_id, new_error)
 
-    return tasks
+    assert new_state in (JobState.Completed, JobState.Error)
 
+    log.debug("completed! updating job %s", job_id)
+    queue_name = await conn.fetchval(
+        """
+        UPDATE violet_jobs
+        SET state = $1,
+            errors = $2
+        WHERE job_id = $3
+        RETURNING queue
+        """,
+        new_state.value,
+        new_error,
+        job_id,
+    )
 
-async def release_tasks(manager, conn, tasks: Dict[str, asyncio.Task]):
-    """Release the given tasks, setting their state to Completed or Error."""
-    for job_id, task in tasks.items():
-        assert task.done()
-
-        if job_id in manager.events:
-            manager.events[job_id].set()
-
-        new_state = JobState.Completed
-        new_error = ""
-
-        try:
-            task.result()
-        except Exception:
-            new_state = JobState.Error
-            new_error = traceback.format_exc()
-            log.error("error on job %r, '%s'", job_id, new_error)
-
-        await conn.execute(
-            """
-            UPDATE violet_jobs
-            SET state = $1,
-                errors = $2
-            WHERE job_id = $3
-            """,
-            new_state,
-            new_error,
-            job_id,
-        )
+    try:
+        manager._poller_sets[queue_name].remove(job_id)
+    except KeyError:
+        pass
 
 
 async def fetch_jobs(
     conn, queue: Queue, state=JobState.NotTaken, scheduled_only: bool = False
 ) -> list:
+    """Fetch a list of jobs based on search parameters"""
     log.debug("querying state=%r for queue %r", state, queue.name)
 
     scheduled_where = (
@@ -103,66 +89,121 @@ async def fetch_jobs(
         AND state = $2
         {scheduled_where}
         ORDER BY inserted_at
-        LIMIT {queue.takes}
+        LIMIT {queue.poller_takes}
         """,
         queue.name,
         state,
     )
 
 
-class StopQueueWorker(Exception):
-    pass
+# async def queue_worker(manager, queue: Queue):
+#    if queue.start_existing_jobs:
+#        await run_jobs(manager, queue, JobState.Taken, raise_on_empty=False)
+#
+#    while True:
+#        await run_jobs(manager, queue, scheduled_only=True)
+#        await asyncio.sleep(queue.period)
 
 
-async def run_jobs(
-    manager,
-    queue,
-    state: JobState = JobState.NotTaken,
-    *,
-    raise_on_empty: bool = True,
-    scheduled_only: bool = False,
-):
-    rows = await fetch_jobs(
-        manager.db, queue, state=state, scheduled_only=scheduled_only
+async def queue_worker_tick(manager, queue, job_id: Flake):
+    """Queue Worker Tick.
+
+    This function:
+     - Locks the given job (if another worker also takes the job via the
+     queue they will fail to lock it properly, it works extremely well for
+     multiple workers)
+     - Prepares all eventing (start and stop events)
+     - Runs the queue function
+        (fail modes are handled more locally at the call)
+     - Fetches the result from the underlying asyncio task and updates the
+        database with it.
+    """
+    row = await fetchrow_with_json(
+        manager.db,
+        """
+        UPDATE violet_jobs
+        SET state = $1, taken_at = (now() at time zone 'utc')
+        WHERE job_id = $2 AND state = $3
+        RETURNING args, name
+        """,
+        JobState.Taken.value,
+        str(job_id),
+        JobState.NotTaken.value,
     )
-    log.debug("queue %r got %d jobs in state %r", queue.name, len(rows), state)
 
-    async with manager.db.acquire() as conn:
-        async with conn.transaction():
-            tasks = await acquire_jobs(manager, conn, queue, rows)
+    if row is None:
+        log.warn("job %r already locked, skipping", job_id)
+        return
 
-    if not tasks:
-        actually_empty = not await manager.db.fetchval(
-            """
-            SELECT count(*) > 0
-            FROM violet_jobs
-            WHERE queue = $1
-              AND (now() at time zone 'utc') <= scheduled_at
-            """,
-            queue.name,
-        )
-        log.debug(
-            "queue %r without jobs, is it full empty? %r", queue.name, actually_empty
+    async with manager.db.acquire() as conn, conn.transaction():
+        await pg_set_json(conn)
+        ctx = QueueJobContext(manager, queue, job_id, row["name"])
+
+        job_id_str = str(job_id)
+        if not queue.custom_start_event and job_id_str in manager.start_events:
+            manager.start_events[job_id_str].set()
+
+        task = manager.loop.create_task(
+            _queue_function_wrapper(queue, ctx, row["args"])
         )
 
-        if raise_on_empty and actually_empty:
-            raise StopQueueWorker()
-        else:
-            return
+        # TODO add configurable timeout for the tasks?
+        await asyncio.wait_for(task, None)
 
-    # wait for all the tasks to run.
-    done, pending = await asyncio.wait(tasks.values())
-    assert not pending
-
-    async with manager.db.acquire() as conn:
-        async with conn.transaction():
-            await release_tasks(manager, conn, tasks)
+        await release_job(manager, conn, task, str(job_id))
 
 
-async def queue_worker(manager, queue: Queue):
-    if queue.start_existing_jobs:
-        await run_jobs(manager, queue, JobState.Taken, raise_on_empty=False)
+async def queue_worker(manager, queue: Queue, worker_id: int):
+    """Main queue worker.
 
+    This worker keeps waiting for any new job in the backing asyncio queue and
+    runs a tick function. The tick function does unique
+    functionality (e.g locking)
+    """
     while True:
-        await run_jobs(manager, queue, scheduled_only=True)
-        await asyncio.sleep(queue.period)
+        log.debug("worker %r %d waiting...", queue.name, worker_id)
+        job_id: Flake = await queue.asyncio_queue.get()
+
+        log.debug("worker %r %d working on %s", queue.name, worker_id, job_id)
+        await queue_worker_tick(manager, queue, job_id)
+
+
+async def queue_poller(manager, queue: Queue):
+    """Queue poller task.
+
+    This task queries the database every second and checks all the jobs that
+    are scheduled for right now, limiting itself to ``queue.poller_takes``
+    jobs per second.
+
+    There is a poller_sets attribute inside Manager related to this. Its
+    purpose is to prevent the poller task from ever pushing repeated jobs.
+
+    This problem arises when the queue function takes longer than a second
+    to execute, and so the job that the poller pushed gets pushed again
+    every second. If the function takes longer (or the worker crashes) the
+    poller would still push new jobs to the queue.
+
+    A set is kept at the Manager level so everyone can coordinate adding
+    and removal of such job IDs for the poller. The poller pushes new IDs,
+    the worker removes the IDs it worked on.
+    """
+    while True:
+        rows = await fetch_jobs(
+            manager.db, queue, state=JobState.NotTaken, scheduled_only=True
+        )
+
+        if rows:
+            log.info("found %d scheduled jobs", len(rows))
+
+        for row in rows:
+            job_id = Flake.from_uuid(row["job_id"])
+            as_str = str(job_id)
+            poller_jobs = manager._poller_sets[queue.name]
+            if as_str in poller_jobs:
+                continue
+
+            log.debug("push from scheduled: %s", job_id)
+            queue.asyncio_queue.put_nowait(job_id)
+            poller_jobs.add(as_str)
+
+        await asyncio.sleep(1)
