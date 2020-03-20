@@ -35,9 +35,6 @@ async def release_job(manager, conn, task: asyncio.Task, job_id: str):
     updates the table."""
     assert task.done()
 
-    if job_id in manager.events:
-        manager.events[job_id].set()
-
     new_state = JobState.Completed
     new_error = ""
 
@@ -63,6 +60,9 @@ async def release_job(manager, conn, task: asyncio.Task, job_id: str):
         new_error,
         job_id,
     )
+
+    if job_id in manager.events:
+        manager.events[job_id].set()
 
     try:
         manager._poller_sets[queue_name].remove(job_id)
