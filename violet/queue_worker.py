@@ -140,22 +140,18 @@ async def queue_worker_tick(manager, queue, job_id: Flake):
         log.warn("job %r already locked, skipping", job_id)
         return
 
-    async with manager.db.acquire() as conn, conn.transaction():
-        await pg_set_json(conn)
-        ctx = QueueJobContext(manager, queue, job_id, row["name"])
+    ctx = QueueJobContext(manager, queue, job_id, row["name"])
 
-        job_id_str = str(job_id)
-        if not queue.custom_start_event and job_id_str in manager.start_events:
-            manager.start_events[job_id_str].set()
+    job_id_str = str(job_id)
+    if not queue.custom_start_event and job_id_str in manager.start_events:
+        manager.start_events[job_id_str].set()
 
-        task = manager.loop.create_task(
-            _queue_function_wrapper(queue, ctx, row["args"])
-        )
+    task = manager.loop.create_task(_queue_function_wrapper(queue, ctx, row["args"]))
 
-        # TODO add configurable timeout for the tasks?
-        await asyncio.wait_for(task, None)
+    # TODO add configurable timeout for the tasks?
+    await asyncio.wait_for(task, None)
 
-        await release_job(manager, conn, task, str(job_id))
+    await release_job(manager, manager.db, task, str(job_id))
 
 
 async def queue_worker(manager, queue: Queue, worker_id: int):
