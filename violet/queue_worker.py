@@ -60,10 +60,13 @@ async def release_job(manager, conn, task: asyncio.Task, job_id: str):
         new_error,
         job_id,
     )
+    log.debug("updated! set job %s => %r", job_id, new_state)
 
     assert queue_name is not None
 
+    log.debug("check %s in %r", job_id, manager.events)
     if job_id in manager.events:
+        log.debug("set end event %s", job_id)
         manager.events[job_id].set()
 
     try:
