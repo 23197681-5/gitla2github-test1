@@ -61,6 +61,8 @@ async def release_job(manager, conn, task: asyncio.Task, job_id: str):
         job_id,
     )
 
+    assert queue_name is not None
+
     if job_id in manager.events:
         manager.events[job_id].set()
 
