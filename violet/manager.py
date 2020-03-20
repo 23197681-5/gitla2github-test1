@@ -13,7 +13,7 @@ from collections import defaultdict
 from hail import Flake, FlakeFactory
 
 from violet.errors import TaskExistsError, QueueExistsError
-from violet.models import Queue, QueueJobStatus, JobDetails
+from violet.models import Queue, QueueJobStatus, JobDetails, JobState
 from violet.queue_worker import queue_worker, queue_poller
 from violet.utils import execute_with_json, fetchrow_with_json
 from violet.event import JobEvent
@@ -76,12 +76,9 @@ class JobManager:
     async def _wrapper(self, function, args, task_id, **kwargs):
         """Wrapper for coroutines, wrapping them in try/excepts for logging"""
         try:
-            log.debug("task tick: %r, state: %r", task_id, kwargs.get("_wrapper_state"))
-
+            log.debug("task tick: %r", task_id)
             async with self.context_creator():
                 await function(*args)
-
-            log.debug("task done: %r", task_id)
         except asyncio.CancelledError:
             log.debug("task %r cancelled", task_id)
         except Exception as exc:
@@ -337,6 +334,21 @@ class JobManager:
         """Wait for a job to complete."""
 
         job_id = str(any_job_id)
+
+        # short-circuit if the given job already completed.
+        # we would hang around forever if we waited for a job that already
+        # released itself (which can happen!)
+        state = await self.db.fetchval(
+            """
+            SELECT state
+            FROM violet_jobs
+            WHERE job_id = $1
+            """,
+            job_id,
+        )
+
+        if state in (JobState.Completed, JobState.Error):
+            return
 
         async def empty_waiter():
             await self.events[job_id].empty_event.wait()
