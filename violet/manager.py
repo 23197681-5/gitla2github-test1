@@ -338,7 +338,7 @@ class JobManager:
         # short-circuit if the given job already completed.
         # we would hang around forever if we waited for a job that already
         # released itself (which can happen!)
-        state = await self.db.fetchval(
+        state_int = await self.db.fetchval(
             """
             SELECT state
             FROM violet_jobs
@@ -346,6 +346,12 @@ class JobManager:
             """,
             job_id,
         )
+
+        if state_int is None:
+            raise ValueError("Unknown job")
+
+        state = JobState(state_int)
+        log.debug("pre-wait fetch %r %r", state_int, state)
 
         if state in (JobState.Completed, JobState.Error):
             return
