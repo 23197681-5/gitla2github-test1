@@ -76,9 +76,12 @@ class JobManager:
     async def _wrapper(self, function, args, task_id, **kwargs):
         """Wrapper for coroutines, wrapping them in try/excepts for logging"""
         try:
-            log.debug("task tick: %r", task_id)
+            log.debug("task tick: %r, state: %r", task_id, kwargs.get("_wrapper_state"))
+
             async with self.context_creator():
                 await function(*args)
+
+            log.debug("task done: %r", task_id)
         except asyncio.CancelledError:
             log.debug("task %r cancelled", task_id)
         except Exception as exc:
