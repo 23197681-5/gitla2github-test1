@@ -137,7 +137,7 @@ async def queue_worker_tick(manager, queue, job_id: Flake):
     )
 
     if row is None:
-        log.warn("job %r already locked, skipping", job_id)
+        log.warning("job %r already locked, skipping", job_id)
         return
 
     ctx = QueueJobContext(manager, queue, job_id, row["name"])
