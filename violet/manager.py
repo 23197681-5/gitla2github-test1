@@ -323,12 +323,18 @@ class JobManager:
             # already cleaned itself.
             self._remove_task(task_id)
 
-    def stop_all(self) -> None:
+    async def stop_all(self, wait: bool = False, timeout: Optional[int] = None) -> None:
         """Stop the job manager by cancelling all tasks."""
         log.debug("cancelling %d tasks", len(self.tasks))
 
+        tasks = []
+
         for task_id in list(self.tasks.keys()):
+            tasks.append(self.tasks[task_id])
             self.stop(task_id)
+
+        if wait:
+            await asyncio.wait_for(tasks, timeout=timeout)
 
     async def wait_job(self, any_job_id: Union[str, Flake], *, timeout=None) -> None:
         """Wait for a job to complete."""
