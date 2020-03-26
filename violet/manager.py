@@ -333,8 +333,8 @@ class JobManager:
             tasks.append(self.tasks[task_id])
             self.stop(task_id)
 
-        if wait:
-            await asyncio.wait_for(tasks, timeout=timeout)
+        if wait and tasks:
+            await asyncio.wait(tasks, timeout=timeout)
 
     async def wait_job(self, any_job_id: Union[str, Flake], *, timeout=None) -> None:
         """Wait for a job to complete."""
