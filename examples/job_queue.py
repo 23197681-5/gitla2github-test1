@@ -95,8 +95,9 @@ def main():
     try:
         loop.run_until_complete(asyncio.sleep(10))
     except KeyboardInterrupt:
-        sched.stop_all()
-        loop.run_until_complete(asyncio.sleep(2))
+        loop.run_until_complete(sched.stop_all())
+    finally:
+        loop.run_until_complete(sched.stop_all())
 
 
 if __name__ == "__main__":
