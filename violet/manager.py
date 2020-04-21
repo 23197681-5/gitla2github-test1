@@ -140,6 +140,7 @@ class JobManager:
         custom_start_event: bool = False,
         fail_mode: Optional[FailMode] = None,
         poller_takes: int = 1,
+        poller_seconds: float = 1.0,
     ):
         """Create a job queue.
 
@@ -183,7 +184,7 @@ class JobManager:
             custom_start_event,
             fail_mode,
             asyncio.Queue(),
-            poller_takes,
+            (poller_takes, poller_seconds),
         )
 
         self.queues[queue_name] = queue

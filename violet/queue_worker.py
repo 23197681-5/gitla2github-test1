@@ -94,7 +94,7 @@ async def fetch_jobs(
         AND state = $2
         {scheduled_where}
         ORDER BY inserted_at
-        LIMIT {queue.poller_takes}
+        LIMIT {queue.poller_rate[0]}
         """,
         queue.name,
         state,
@@ -207,4 +207,4 @@ async def queue_poller(manager, queue: Queue):
             queue.asyncio_queue.put_nowait(job_id)
             poller_jobs.add(as_str)
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(queue.poller_rate[1])

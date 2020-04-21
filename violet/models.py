@@ -6,13 +6,7 @@ import enum
 import asyncio
 import datetime
 
-from typing import (
-    Iterable,
-    Callable,
-    Any,
-    Awaitable,
-    Optional,
-)
+from typing import Iterable, Callable, Any, Awaitable, Tuple
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -45,7 +39,7 @@ class Queue:
     custom_start_event: bool
     fail_mode: FailMode
     asyncio_queue: asyncio.Queue
-    poller_takes: int
+    poller_rate: Tuple[int, float]
 
 
 class JobState(enum.IntEnum):
