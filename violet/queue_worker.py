@@ -230,6 +230,10 @@ async def queue_poller(manager, queue: Queue):
     are scheduled for right now, limiting itself to ``queue.poller_takes``
     jobs per second.
 
+    Before running that main loop, it checks if there are any locked jobs,
+    and if there are, those get pushed to the queue immediately (after being
+    unlocked).
+
     There is a poller_sets attribute inside Manager related to this. Its
     purpose is to prevent the poller task from ever pushing repeated jobs.
 
