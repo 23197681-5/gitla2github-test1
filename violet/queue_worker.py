@@ -177,6 +177,52 @@ async def queue_worker(manager, queue: Queue, worker_id: int):
         await queue_worker_tick(manager, queue, job_id)
 
 
+def _push_rows_to_queue(manager, queue: Queue, rows: list) -> None:
+    """Given a list of rows from fetch_jobs, push them to the queue."""
+
+    if rows:
+        log.info("Directly pushing %d jobs to %r", len(rows), queue.name)
+
+    for row in rows:
+        job_id = Flake.from_uuid(row["job_id"])
+        as_str = str(job_id)
+
+        # prevent pushing the same jobs by putting them in a set and checking
+        # if they were already worked on.
+        poller_jobs = manager._poller_sets[queue.name]
+        if as_str in poller_jobs:
+            continue
+
+        log.debug("pushing job: %s", job_id)
+        queue.asyncio_queue.put_nowait(job_id)
+        poller_jobs.add(as_str)
+
+
+async def run_taken_jobs(manager, queue: Queue):
+    rows = await fetch_jobs(
+        manager.db, queue, state=JobState.Taken, scheduled_only=True, all=True
+    )
+
+    # if any rows were found in the locked state and we are starting the
+    # worker, we need to unlock it before pushing can happen.
+    async with manager.db.acquire() as conn:
+        for row in rows:
+            job_id = Flake.from_uuid(row["job_id"])
+            as_str = str(job_id)
+
+            log.debug("unlocking job: %s", job_id)
+            await conn.execute(
+                """
+                UPDATE violet_jobs
+                SET state = 0
+                WHERE job_id = $1
+                """,
+                as_str,
+            )
+
+    _push_rows_to_queue(manager, queue, rows)
+
+
 async def queue_poller(manager, queue: Queue):
     """Queue poller task.
 
