@@ -242,23 +242,16 @@ async def queue_poller(manager, queue: Queue):
     and removal of such job IDs for the poller. The poller pushes new IDs,
     the worker removes the IDs it worked on.
     """
+
+    if queue.start_existing_jobs:
+        log.info("Pushing any locked jobs")
+        await run_taken_jobs(manager, queue)
+        log.info("Pushed any locked jobs")
+
     while True:
         rows = await fetch_jobs(
             manager.db, queue, state=JobState.NotTaken, scheduled_only=True
         )
 
-        if rows:
-            log.info("found %d scheduled jobs", len(rows))
-
-        for row in rows:
-            job_id = Flake.from_uuid(row["job_id"])
-            as_str = str(job_id)
-            poller_jobs = manager._poller_sets[queue.name]
-            if as_str in poller_jobs:
-                continue
-
-            log.debug("push from scheduled: %s", job_id)
-            queue.asyncio_queue.put_nowait(job_id)
-            poller_jobs.add(as_str)
-
+        _push_rows_to_queue(manager, queue, rows)
         await asyncio.sleep(queue.poller_rate[1])
