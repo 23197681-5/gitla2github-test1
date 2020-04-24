@@ -9,7 +9,7 @@ from typing import Set
 
 from hail import Flake
 from .models import Queue, JobState, QueueJobContext, JobDetails
-from .utils import fetch_with_json, pg_set_json, fetchrow_with_json
+from .utils import fetch_with_json, fetchrow_with_json
 
 log = logging.getLogger(__name__)
 
@@ -76,10 +76,18 @@ async def release_job(manager, conn, task: asyncio.Task, job_id: str):
 
 
 async def fetch_jobs(
-    conn, queue: Queue, state=JobState.NotTaken, scheduled_only: bool = False
+    conn,
+    queue: Queue,
+    state=JobState.NotTaken,
+    scheduled_only: bool = False,
+    all: bool = False,
 ) -> list:
-    """Fetch a list of jobs based on search parameters"""
+    """Fetch a list of jobs based on search parameters."""
     log.debug("querying state=%r for queue %r", state, queue.name)
+
+    limit_clause = ""
+    if not all:
+        limit_clause = f"LIMIT {queue.poller_rate[0]}"
 
     scheduled_where = (
         "AND (now() at time zone 'utc') >= scheduled_at" if scheduled_only else ""
@@ -94,7 +102,7 @@ async def fetch_jobs(
         AND state = $2
         {scheduled_where}
         ORDER BY inserted_at
-        LIMIT {queue.poller_rate[0]}
+        {limit_clause}
         """,
         queue.name,
         state,
