@@ -115,15 +115,31 @@ class JobManager:
         )
 
     def spawn_periodic(
-        self, function, args: List[Any], *, period: float = 5, name: str, **kwargs
+        self,
+        function,
+        args: List[Any],
+        *,
+        period: float = 5,
+        name: str,
+        reverse: bool = False,
+        **kwargs,
     ):
         """Spawn a function that ticks itself periodically every
-        ``period`` seconds."""
+        ``period`` seconds.
+
+        ``reverse`` decides which goes first, the sleep call, or the function
+        call. Specific usage of this can apply.
+        """
 
         async def ticker_func():
             while True:
+                if reverse:
+                    await asyncio.sleep(period)
+
                 await function(*args)
-                await asyncio.sleep(period)
+
+                if not reverse:
+                    await asyncio.sleep(period)
 
         return self._create_task(
             name, main_coroutine=self._wrapper(ticker_func, [], name, **kwargs)
