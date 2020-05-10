@@ -77,3 +77,6 @@ class QueueJobContext:
 
         if job_id_str in self.manager.start_events:
             self.manager.start_events[job_id_str].set()
+
+    async def set_state(self, state) -> None:
+        await self.manager.set_job_state(self.job_id, state)
