@@ -110,6 +110,10 @@ class JobManager:
         of a crash, use a job queue.
         """
 
+        mode = kwargs.get("fail_mode")
+        if mode is not None and not isinstance(mode, FailMode):
+            raise ValueError("Failure modes must be instances of FailMode.")
+
         return self._create_task(
             name, main_coroutine=self._wrapper(function, args, name, **kwargs)
         )
