@@ -13,6 +13,8 @@ from .utils import fetch_with_json, fetchrow_with_json
 
 log = logging.getLogger(__name__)
 
+# XXX: change from violet_jobs
+
 
 async def _queue_function_wrapper(queue, ctx, fail_mode_state=None):
     """Wrapper for the queue function call.
@@ -21,6 +23,8 @@ async def _queue_function_wrapper(queue, ctx, fail_mode_state=None):
     """
     try:
         log.debug("job %s calling with args %r", ctx.job_id, ctx.args)
+        await queue.cls.start(ctx)
+        queue.cls.sched.start_events[str(ctx.job_id)].set()
         await queue.cls.handle(ctx)
     except Exception as exc:
         fail_mode_state = fail_mode_state or {}
@@ -151,11 +155,8 @@ async def queue_worker_tick(manager, queue, job_id: Flake):
         log.warning("job %r already locked, skipping", job_id)
         return
 
+    # XXX: args????
     ctx = QueueJobContext(manager, queue, job_id, row["name"])
-
-    job_id_str = str(job_id)
-    if not queue.custom_start_event and job_id_str in manager.start_events:
-        manager.start_events[job_id_str].set()
 
     task = manager.loop.create_task(_queue_function_wrapper(queue, ctx, row["args"]))
 
