@@ -253,7 +253,7 @@ async def queue_poller(queue: Queue):
     the worker removes the IDs it worked on.
     """
 
-    if queue.start_existing_jobs:
+    if queue.cls.start_existing_jobs:
         log.info("Pushing any locked jobs")
         await run_taken_jobs(queue)
         log.info("Pushed any locked jobs")
