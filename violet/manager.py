@@ -231,6 +231,62 @@ class JobManager:
         except Exception:
             log.exception("Queue worker for queue %r failed", queue.name)
 
+    async def raw_push(
+        self,
+        cls,
+        args: Tuple[Any],
+        *,
+        name: Optional[str] = None,
+        scheduled_at: Optional[datetime.datetime] = None,
+    ) -> Flake:
+        """Push data to a job queue."""
+        if len(args) != len(cls.args):
+            raise TypeError("Invalid argument arity")
+
+        # XXX mapping from cls.name to queue state data (asyncio queue etc)
+
+        log.debug("try push %r %r", cls.name, args)
+        actual_scheduled_at = scheduled_at or datetime.datetime.utcnow()
+
+        job_id = self.factory.get_flake()
+        name = name or uuid.uuid4().hex
+
+        arg_line_columns: str = ""
+        if cls.args:
+            # for any declared args on the job queue,
+            # generate "column_a, column_b"
+            arg_line_columns = f', {",".join(cls.args)}'
+
+        arg_line_values: str = ""
+        if args:
+            # for any incoming args, generate "$4, $5..."
+            arg_line_values = ", " + ",".join(
+                f"${index + 4}" for index in range(len(args))
+            )
+
+        await execute_with_json(
+            self.db,
+            f"""
+            INSERT INTO {cls.name}
+                (job_id, name, scheduled_at{arg_line_columns})
+            VALUES
+                ($1, $2, $3{arg_line_values})
+            """,
+            str(job_id),
+            name,
+            actual_scheduled_at,
+            *args,
+        )
+
+        # only dispatch to asyncio queue if it is actually meant to be now.
+        # TODO: a better heuristic would be getting the timedelta between
+        # given scheduled_at and dispatching to the queue if it is less than
+        # 1 second, but this already does the job.
+        if scheduled_at is None:
+            queue.asyncio_queue.put_nowait(job_id)
+
+        return job_id
+
     async def push_queue(
         self, queue_name: str, args: List[Any], *, name: Optional[str] = None, **kwargs,
     ) -> Flake:
