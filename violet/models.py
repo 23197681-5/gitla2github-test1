@@ -52,6 +52,7 @@ class QueueJobStatus:
     errors: str
     inserted_at: datetime.datetime
     scheduled_at: datetime.datetime
+    taken_at: datetime.datetime
 
 
 @dataclass

@@ -66,7 +66,7 @@ class JobQueue:
             cls.sched.db,
             f"""
             SELECT
-                state, errors, inserted_at, scheduled_at
+                state, errors, inserted_at, scheduled_at, taken_at
             FROM {cls.name}
             WHERE
                 job_id = $1
