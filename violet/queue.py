@@ -102,9 +102,9 @@ class JobQueue:
         """Fetch a job's internal state."""
         row = await fetchrow_with_json(
             cls.sched.db,
-            """
+            f"""
             SELECT internal_state
-            FROM violet_jobs
+            FROM {cls.name}
             WHERE job_id = $1
             """,
             str(job_id),
