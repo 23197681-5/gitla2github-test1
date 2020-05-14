@@ -7,7 +7,7 @@ import uuid
 import asyncio
 import logging
 import random
-from typing import List, Any, Iterable, Dict, Optional, Union, Callable, Set
+from typing import List, Any, Iterable, Dict, Optional, Union, Callable, Set, Tuple
 from collections import defaultdict
 
 from hail import Flake, FlakeFactory
@@ -18,6 +18,7 @@ from violet.queue_worker import queue_worker, queue_poller
 from violet.utils import execute_with_json, fetchrow_with_json
 from violet.event import JobEvent
 from violet.fail_modes import FailMode, LogOnly, RaiseErr
+from violet.queue import JobQueue
 
 log = logging.getLogger(__name__)
 
@@ -149,25 +150,12 @@ class JobManager:
             name, main_coroutine=self._wrapper(ticker_func, [], name, **kwargs)
         )
 
-    def create_job_queue(
-        self,
-        queue_name: str,
-        *,
-        args: Iterable[type],
-        handler: Callable[..., Any],
-        workers: int = 1,
-        start_existing_jobs: bool = True,
-        custom_start_event: bool = False,
-        fail_mode: Optional[FailMode] = None,
-        poller_takes: int = 1,
-        poller_seconds: float = 1.0,
-    ):
+    def register_job_queue(self, cls) -> None:
         """Create a job queue.
 
         The job queue MUST be declared at the start of the application so
         job recovery can happen as soon as possible. It is also required to
-        declare the queue before any queue operations, as they won't know about
-        the queue.
+        declare the queue before any queue operations.
 
         To enhance the concurrency of the queue on high error rates, the first
         consideration is fixing the error first, and the second, is to raise
@@ -191,30 +179,29 @@ class JobManager:
         ``poller_takes`` sets the maximum amount of jobs that will be
         taken by the poller and be inserted into the job queue.
         """
-        fail_mode = fail_mode or RaiseErr(log_error=True)
+        # TODO: move those docs to JobQueue docstrings
+        if not isinstance(cls, JobQueue):
+            raise TypeError("Given class is not a subclass of JobQueue")
+
+        try:
+            queue_name = getattr(cls, "name")
+        except AttributeError:
+            raise TypeError("Queues must have the name attribute.")
+
+        cls.fail_mode = cls.fail_mode or RaiseErr(log_error=True)
 
         if queue_name in self.queues:
             raise QueueExistsError()
 
-        queue = Queue(
-            queue_name,
-            args,
-            handler,
-            start_existing_jobs,
-            custom_start_event,
-            fail_mode,
-            asyncio.Queue(),
-            (poller_takes, poller_seconds),
-        )
-
+        queue = Queue(queue_name, cls)
+        cls._sched = self
         self.queues[queue_name] = queue
 
         # TODO create the resumer task (fetch existing jobs on Taken state
         # and send them to asyncio_queue)
-
         self.spawn(queue_poller, [self, queue], name=f"queue_poller_{queue_name}")
 
-        for worker_id in range(workers):
+        for worker_id in range(cls.workers):
             self.spawn(
                 self._queue_worker_wrapper,
                 [queue, worker_id],
