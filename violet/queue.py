@@ -1,9 +1,12 @@
+import logging
 from typing import Optional, Tuple, Union
 from hail import Flake
 from violet.fail_modes import FailMode
 from violet.utils import execute_with_json, fetchrow_with_json
-from violet.models import QueueJobStatus
+from violet.models import QueueJobStatus, JobState
 from violet.manager import JobManager
+
+log = logging.getLogger(__name__)
 
 
 class JobQueue:
@@ -108,3 +111,44 @@ class JobQueue:
         )
 
         return row["internal_state"] if row is not None else None
+
+    @classmethod
+    async def wait_job(cls, any_job_id: Union[str, Flake], *, timeout=None) -> None:
+        """Wait for a job to complete."""
+
+        job_id = str(any_job_id)
+
+        sched = cls.sched
+
+        # short-circuit if the given job already completed.
+        # we would hang around forever if we waited for a job that already
+        # released itself (which can happen!)
+        state_int = await sched.db.fetchval(
+            f"""
+            SELECT state
+            FROM {cls.name}
+            WHERE job_id = $1
+            """,
+            job_id,
+        )
+
+        if state_int is None:
+            raise ValueError("Unknown job")
+
+        state = JobState(state_int)
+        log.debug("pre-wait fetch %r %r", state_int, state)
+
+        if state in (JobState.Completed, JobState.Error):
+            return
+
+        async def empty_waiter():
+            await sched.events[job_id].empty_event.wait()
+            sched.events.pop(job_id)
+            sched.empty_waiters.pop(job_id)
+
+        if job_id not in sched.empty_waiters:
+            sched.empty_waiters[job_id] = sched.spawn(
+                empty_waiter, [], name=f"empty_waiter:{job_id}"
+            )
+
+        await asyncio.wait_for(sched.events[job_id].wait(), timeout)

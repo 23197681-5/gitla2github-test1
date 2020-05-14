@@ -310,44 +310,6 @@ class JobManager:
         if wait and tasks:
             await asyncio.wait(tasks, timeout=timeout)
 
-    async def wait_job(self, any_job_id: Union[str, Flake], *, timeout=None) -> None:
-        """Wait for a job to complete."""
-
-        job_id = str(any_job_id)
-
-        # short-circuit if the given job already completed.
-        # we would hang around forever if we waited for a job that already
-        # released itself (which can happen!)
-        state_int = await self.db.fetchval(
-            """
-            SELECT state
-            FROM violet_jobs
-            WHERE job_id = $1
-            """,
-            job_id,
-        )
-
-        if state_int is None:
-            raise ValueError("Unknown job")
-
-        state = JobState(state_int)
-        log.debug("pre-wait fetch %r %r", state_int, state)
-
-        if state in (JobState.Completed, JobState.Error):
-            return
-
-        async def empty_waiter():
-            await self.events[job_id].empty_event.wait()
-            self.events.pop(job_id)
-            self.empty_waiters.pop(job_id)
-
-        if job_id not in self.empty_waiters:
-            self.empty_waiters[job_id] = self.spawn(
-                empty_waiter, [], name=f"empty_waiter:{job_id}"
-            )
-
-        await asyncio.wait_for(self.events[job_id].wait(), timeout)
-
     async def wait_job_start(
         self, any_job_id: Union[str, Flake], *, timeout=None
     ) -> None:
