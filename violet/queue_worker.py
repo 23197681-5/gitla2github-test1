@@ -14,20 +14,23 @@ from .utils import fetch_with_json, fetchrow_with_json
 log = logging.getLogger(__name__)
 
 
-async def _queue_function_wrapper(queue, ctx, args, state=None):
+async def _queue_function_wrapper(queue, ctx, fail_mode_state=None):
     """Wrapper for the queue function call.
 
     This wrapper locally manages the declared fail mode of the queue.
-
     """
     try:
-        log.debug("job %s calling with args %r", ctx.job_id, args)
-        await queue.function(ctx, *args)
+        log.debug("job %s calling with args %r", ctx.job_id, ctx.args)
+        await queue.cls.handle(ctx)
     except Exception as exc:
-        state = state or {}
-        retry = await queue.fail_mode.handle(JobDetails(ctx.job_id), exc, state)
+        fail_mode_state = fail_mode_state or {}
+        retry = await queue.fail_mode.handle(
+            JobDetails(ctx.job_id), exc, fail_mode_state
+        )
         if retry:
-            return await _queue_function_wrapper(queue, ctx, args, state=state)
+            return await _queue_function_wrapper(
+                queue, ctx, args, fail_mode_state=fail_mode_state
+            )
 
 
 async def release_job(manager, conn, task: asyncio.Task, job_id: str):
