@@ -37,10 +37,12 @@ async def _queue_function_wrapper(queue, ctx, fail_mode_state=None):
             )
 
 
-async def release_job(sched, task: asyncio.Task, job_id: str):
+async def release_job(queue, task: asyncio.Task, job_id: str):
     """Release a single job. Fetches the result from it and
     updates the table."""
+    sched = queue.cls.sched
     conn = sched.db
+
     assert task.done()
 
     new_state = JobState.Completed
@@ -56,13 +58,12 @@ async def release_job(sched, task: asyncio.Task, job_id: str):
     assert new_state in (JobState.Completed, JobState.Error)
 
     log.debug("completed! updating job %s", job_id)
-    queue_name = await conn.fetchval(
+    await conn.execute(
         """
         UPDATE violet_jobs
         SET state = $1,
             errors = $2
         WHERE job_id = $3
-        RETURNING queue
         """,
         new_state.value,
         new_error,
@@ -70,15 +71,13 @@ async def release_job(sched, task: asyncio.Task, job_id: str):
     )
     log.debug("updated! set job %s => %r", job_id, new_state)
 
-    assert queue_name is not None
-
     log.debug("check %s in %r", job_id, sched.events)
     if job_id in sched.events:
         log.debug("set end event %s", job_id)
         sched.events[job_id].set()
 
     try:
-        sched._poller_sets[queue_name].remove(job_id)
+        sched._poller_sets[queue.name].remove(job_id)
     except KeyError:
         pass
 
@@ -166,7 +165,7 @@ async def queue_worker_tick(queue, job_id: Flake):
     # TODO add configurable timeout for the tasks?
     await asyncio.wait_for(task, None)
 
-    await release_job(queue.cls.sched, task, str(job_id))
+    await release_job(queue, task, str(job_id))
 
 
 async def queue_worker(queue: Queue, worker_id: int):
