@@ -46,12 +46,12 @@ class JobState(enum.IntEnum):
 
 @dataclass
 class QueueJobStatus:
-    queue_name: str
+    """Represents the status of a job in a job queue."""
+
     state: JobState
-    fail_mode: str
     errors: str
-    args: Iterable[type]
     inserted_at: datetime.datetime
+    scheduled_at: datetime.datetime
 
 
 @dataclass
