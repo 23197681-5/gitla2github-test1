@@ -33,7 +33,7 @@ async def _queue_function_wrapper(queue, ctx, fail_mode_state=None):
         )
         if retry:
             return await _queue_function_wrapper(
-                queue, ctx, args, fail_mode_state=fail_mode_state
+                queue, ctx, fail_mode_state=fail_mode_state
             )
 
 
