@@ -276,57 +276,6 @@ class JobManager:
 
         return job_id
 
-    async def fetch_queue_job_status(
-        self, job_id: Union[str, Flake]
-    ) -> Optional[QueueJobStatus]:
-        row = await fetchrow_with_json(
-            self.db,
-            """
-            SELECT
-                queue, state, fail_mode, errors, args, inserted_at
-            FROM violet_jobs
-            WHERE
-                job_id = $1
-            """,
-            str(job_id),
-        )
-
-        if row is None:
-            return None
-
-        return QueueJobStatus(*row)
-
-    async def set_job_state(
-        self, job_id: Union[str, Flake], state: Dict[Any, Any]
-    ) -> None:
-        await execute_with_json(
-            self.db,
-            """
-            UPDATE violet_jobs
-            SET internal_state = $1
-            WHERE
-                job_id = $2
-            """,
-            state,
-            str(job_id),
-        )
-
-    async def fetch_job_state(
-        self, job_id: Union[str, Flake]
-    ) -> Optional[Dict[Any, Any]]:
-        row = await fetchrow_with_json(
-            self.db,
-            """
-            SELECT internal_state AS state
-            FROM violet_jobs
-            WHERE
-                job_id = $1
-            """,
-            str(job_id),
-        )
-
-        return row["state"] if row is not None else None
-
     def _remove_task(self, task_id: str) -> None:
         """Remove a job from the internal task list."""
         try:
