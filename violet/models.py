@@ -33,13 +33,8 @@ class FailMode(ABC):
 @dataclass
 class Queue:
     name: str
-    args: Iterable[type]
-    function: Callable[..., Awaitable[Any]]
-    start_existing_jobs: bool
-    custom_start_event: bool
-    fail_mode: FailMode
-    asyncio_queue: asyncio.Queue
-    poller_rate: Tuple[int, float]
+    cls: Any
+    asyncio_queue: asyncio.Queue = asyncio.Queue()
 
 
 class JobState(enum.IntEnum):
