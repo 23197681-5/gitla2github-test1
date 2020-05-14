@@ -98,11 +98,13 @@ async def fetch_jobs(
     scheduled_where = (
         "AND (now() at time zone 'utc') >= scheduled_at" if scheduled_only else ""
     )
+
+    # XXX: args management?
     return await fetch_with_json(
         queue.cls.sched.db,
         f"""
         SELECT job_id, name, args
-        FROM violet_jobs
+        FROM {queue.cls.name}
         WHERE
             queue = $1
         AND state = $2
@@ -140,8 +142,8 @@ async def queue_worker_tick(queue, job_id: Flake):
     db = queue.cls.sched.db
     row = await fetchrow_with_json(
         db,
-        """
-        UPDATE violet_jobs
+        f"""
+        UPDATE {queue.cls.name}
         SET state = $1, taken_at = (now() at time zone 'utc')
         WHERE job_id = $2 AND state = $3
         RETURNING args, name
