@@ -265,52 +265,13 @@ class JobManager:
             *args,
         )
 
+        queue = self.queues[cls.name]
+
         # only dispatch to asyncio queue if it is actually meant to be now.
         # TODO: a better heuristic would be getting the timedelta between
         # given scheduled_at and dispatching to the queue if it is less than
         # 1 second, but this already does the job.
         if scheduled_at is None:
-            queue.asyncio_queue.put_nowait(job_id)
-
-        return job_id
-
-    async def push_queue(
-        self, queue_name: str, args: List[Any], *, name: Optional[str] = None, **kwargs,
-    ) -> Flake:
-        """Push data to a job queue."""
-
-        try:
-            queue = self.queues[queue_name]
-        except KeyError:
-            raise ValueError(f"Queue {queue_name} does not exist")
-
-        log.debug("try push %r %r", queue_name, args)
-        scheduled_at = kwargs.get("scheduled_at") or datetime.datetime.utcnow()
-
-        job_id = self.factory.get_flake()
-        name = name or uuid.uuid4().hex
-
-        await execute_with_json(
-            self.db,
-            """
-            INSERT INTO violet_jobs
-                (job_id, name, queue, args, scheduled_at)
-            VALUES
-                ($1, $2, $3, $4, $5)
-            """,
-            str(job_id),
-            name,
-            queue_name,
-            args,
-            scheduled_at,
-        )
-        log.debug("pushed %r %r", queue_name, args)
-
-        # only dispatch to asyncio queue if it is actually meant to be now.
-        # TODO: a better heuristic would be getting the timedelta between
-        # given scheduled_at and dispatching to the queue if it is less than
-        # 1 second, but this already does the job.
-        if not kwargs.get("scheduled_at"):
             queue.asyncio_queue.put_nowait(job_id)
 
         return job_id
