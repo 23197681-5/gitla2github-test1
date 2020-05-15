@@ -13,8 +13,6 @@ from .utils import fetch_with_json, fetchrow_with_json
 
 log = logging.getLogger(__name__)
 
-# XXX: change from violet_jobs
-
 
 async def _queue_function_wrapper(queue, ctx, fail_mode_state=None):
     """Wrapper for the queue function call.
@@ -59,8 +57,8 @@ async def release_job(queue, task: asyncio.Task, job_id: str):
 
     log.debug("completed! updating job %s", job_id)
     await conn.execute(
-        """
-        UPDATE violet_jobs
+        f"""
+        UPDATE {queue.cls.name}
         SET state = $1,
             errors = $2
         WHERE job_id = $3
@@ -218,8 +216,8 @@ async def run_taken_jobs(queue: Queue):
 
             log.debug("unlocking job: %s", job_id)
             await conn.execute(
-                """
-                UPDATE violet_jobs
+                f"""
+                UPDATE {queue.cls.name}
                 SET state = 0
                 WHERE job_id = $1
                 """,
