@@ -1,3 +1,15 @@
+# 0.3 (WIP)
+
+ - rewrite of job queues
+   - database structure changed heavily. instead of a single `violet_jobs`
+     table, there's one table per job queue.
+   - job queues are now declared via a class, instead of registering manually
+     to the job manager.
+   - job queues can declare non-jsonb parameters via their table's columns.
+   - APIs that were on `JobManager` are now on the job queue class itself.
+   - `custom_start_event` is dropped in favor of `setup` / `handle`
+     classmethods
+
 # 0.2.3
 
  - add custom start events
