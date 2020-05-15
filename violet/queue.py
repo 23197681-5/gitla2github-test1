@@ -26,9 +26,9 @@ class MetaJobQueue(type):
     @property
     def name(cls):
         try:
-            return getattr(cls, "name")
+            return getattr(cls, "queue_name")
         except AttributeError:
-            raise RuntimeError("Job queues must have the `name` attribute.")
+            raise RuntimeError("Job queues must have the `queue_name` attribute.")
 
 
 class JobQueue(Generic[QueueArgType], metaclass=MetaJobQueue):

@@ -9,7 +9,7 @@ from hail import Flake
 
 
 class ExampleJobQueue(violet.JobQueue[Tuple[int, int]]):
-    name = "my_queue"
+    queue_name = "example_queue"
     workers = 2
 
     # map the arguments when pushing to the columns in the
