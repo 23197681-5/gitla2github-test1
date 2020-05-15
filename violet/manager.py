@@ -180,9 +180,6 @@ class JobManager:
         taken by the poller and be inserted into the job queue.
         """
         # TODO: move those docs to JobQueue docstrings
-        if not isinstance(cls, JobQueue):
-            raise TypeError("Given class is not a subclass of JobQueue")
-
         try:
             queue_name = getattr(cls, "name")
         except AttributeError:
