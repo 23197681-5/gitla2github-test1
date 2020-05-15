@@ -31,6 +31,13 @@ class MetaJobQueue(type):
         except AttributeError:
             raise RuntimeError("Job queues must have the `queue_name` attribute.")
 
+    @property
+    def poller_rate(cls) -> Tuple[int, float]:
+        try:
+            return cls.poller_takes, cls.poller_seconds
+        except AttributeError:
+            raise RuntimeError("Queue class must have poller arguments declared")
+
 
 class JobQueue(Generic[QueueArgType], metaclass=MetaJobQueue):
     """Represents a job queue."""
@@ -40,11 +47,6 @@ class JobQueue(Generic[QueueArgType], metaclass=MetaJobQueue):
     fail_mode: Optional[FailMode] = None
     poller_takes: int = 1
     poller_seconds: float = 1.0
-
-    @property
-    @classmethod
-    def poller_rate(cls) -> Tuple[int, float]:
-        return cls.poller_takes, cls.poller_seconds
 
     @classmethod
     def create_args(_, row) -> QueueArgType:
