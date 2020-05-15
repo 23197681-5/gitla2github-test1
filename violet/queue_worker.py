@@ -21,7 +21,7 @@ async def _queue_function_wrapper(queue, ctx, *, fail_mode_state=None):
     """
     try:
         log.debug("job %s calling with args %r", ctx.job_id, ctx.args)
-        await queue.cls.start(ctx)
+        await queue.cls.setup(ctx)
         queue.cls.sched.start_events[str(ctx.job_id)].set()
         await queue.cls.handle(ctx)
     except Exception as exc:
