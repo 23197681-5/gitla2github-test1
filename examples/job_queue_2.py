@@ -1,20 +1,24 @@
 import os
 import logging
 import asyncio
-from typing import List
+from typing import List, Tuple
 
 import asyncpg
 import violet
 from hail import Flake
 
 
-class ExampleJobQueue(violet.JobQueue):
+class ExampleJobQueue(violet.JobQueue[Tuple[int, int]]):
     name = "my_queue"
     workers = 2
 
     # map the arguments when pushing to the columns in the
     # job queue's table
     args = ("number_a", "number_b")
+
+    @classmethod
+    def create_args(cls, row):
+        return row["number_a"], row["number_b"]
 
     @classmethod
     async def push(cls, a: int, b: int, **kwargs) -> Flake:
@@ -25,7 +29,9 @@ class ExampleJobQueue(violet.JobQueue):
         await asyncio.sleep(0.5)
 
     @classmethod
-    async def handle(_, ctx, a, b):
+    async def handle(_, ctx):
+        a, b = ctx.args
+        print(a, b)
         await ctx.manager.set_job_state(ctx.job_id, {"note": "awoo"})
         state = await ctx.manager.fetch_job_state(ctx.job_id)
         assert state["note"] == "awoo"
