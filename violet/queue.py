@@ -6,7 +6,6 @@ from hail import Flake
 from violet.fail_modes import FailMode
 from violet.utils import execute_with_json, fetchrow_with_json
 from violet.models import QueueJobStatus, JobState
-from violet.manager import JobManager
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ class JobQueue(Generic[QueueArgType]):
 
     @property
     @classmethod
-    def sched(cls) -> JobManager:
+    def sched(cls):
         try:
             return getattr(cls, "_sched")
         except AttributeError:
