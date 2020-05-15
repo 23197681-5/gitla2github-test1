@@ -26,7 +26,7 @@ async def _queue_function_wrapper(queue, ctx, *, fail_mode_state=None):
         await queue.cls.handle(ctx)
     except Exception as exc:
         fail_mode_state = fail_mode_state or {}
-        retry = await queue.fail_mode.handle(
+        retry = await queue.cls.fail_mode.handle(
             JobDetails(ctx.job_id), exc, fail_mode_state
         )
         if retry:
@@ -75,7 +75,7 @@ async def release_job(queue, task: asyncio.Task, job_id: str):
         sched.events[job_id].set()
 
     try:
-        sched._poller_sets[queue.name].remove(job_id)
+        sched._poller_sets[queue.cls.name].remove(job_id)
     except KeyError:
         pass
 
@@ -87,11 +87,11 @@ async def fetch_jobs(
     all: bool = False,
 ) -> list:
     """Fetch a list of job IDs based on search parameters."""
-    log.debug("querying state=%r for queue %r", state, queue.name)
+    log.debug("querying state=%r for queue %r", state, queue.cls.name)
 
     limit_clause = ""
     if not all:
-        limit_clause = f"LIMIT {queue.poller_rate[0]}"
+        limit_clause = f"LIMIT {queue.cls.poller_rate[0]}"
 
     scheduled_where = (
         "AND (now() at time zone 'utc') >= scheduled_at" if scheduled_only else ""
@@ -102,14 +102,11 @@ async def fetch_jobs(
         f"""
         SELECT job_id
         FROM {queue.cls.name}
-        WHERE
-            queue = $1
-        AND state = $2
+        WHERE state = $1
         {scheduled_where}
         ORDER BY inserted_at
         {limit_clause}
         """,
-        queue.name,
         state,
     )
 
@@ -152,7 +149,7 @@ async def queue_worker_tick(queue, job_id: Flake):
         log.warning("job %r already locked, skipping", job_id)
         return
 
-    args = queue.create_args(row)
+    args = queue.cls.create_args(row)
     ctx = QueueJobContext(queue, job_id, row["name"], args)
     task = queue.cls.sched.loop.create_task(_queue_function_wrapper(queue, ctx))
 
@@ -170,10 +167,10 @@ async def queue_worker(queue: Queue, worker_id: int):
     functionality (e.g locking)
     """
     while True:
-        log.debug("worker %r %d waiting...", queue.name, worker_id)
+        log.debug("worker %r %d waiting...", queue.cls.name, worker_id)
         job_id: Flake = await queue.asyncio_queue.get()
 
-        log.debug("worker %r %d working on %s", queue.name, worker_id, job_id)
+        log.debug("worker %r %d working on %s", queue.cls.name, worker_id, job_id)
         await queue_worker_tick(queue, job_id)
 
 
@@ -181,7 +178,7 @@ def _push_rows_to_queue(queue: Queue, rows: list) -> None:
     """Given a list of rows from fetch_jobs, push them to the queue."""
 
     if rows:
-        log.info("Directly pushing %d jobs to %r", len(rows), queue.name)
+        log.info("Directly pushing %d jobs to %r", len(rows), queue.cls.name)
 
     for row in rows:
         job_id = Flake.from_uuid(row["job_id"])
@@ -189,7 +186,7 @@ def _push_rows_to_queue(queue: Queue, rows: list) -> None:
 
         # prevent pushing the same jobs by putting them in a set and checking
         # if they were already worked on.
-        poller_jobs = queue.cls.sched._poller_sets[queue.name]
+        poller_jobs = queue.cls.sched._poller_sets[queue.cls.name]
         if as_str in poller_jobs:
             continue
 
@@ -254,4 +251,4 @@ async def queue_poller(queue: Queue):
         rows = await fetch_jobs(queue, state=JobState.NotTaken, scheduled_only=True)
 
         _push_rows_to_queue(queue, rows)
-        await asyncio.sleep(queue.poller_rate[1])
+        await asyncio.sleep(queue.cls.poller_rate[1])
