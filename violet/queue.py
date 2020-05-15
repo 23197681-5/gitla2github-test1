@@ -23,6 +23,13 @@ class MetaJobQueue(type):
             raise RuntimeError("Job queue was not initialized.")
         return getattr(cls, "_sched")
 
+    @property
+    def name(cls):
+        try:
+            return getattr(cls, "name")
+        except AttributeError:
+            raise RuntimeError("Job queues must have the `name` attribute.")
+
 
 class JobQueue(Generic[QueueArgType], metaclass=MetaJobQueue):
     """Represents a job queue."""
