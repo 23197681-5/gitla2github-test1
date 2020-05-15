@@ -14,7 +14,7 @@ from .utils import fetch_with_json, fetchrow_with_json
 log = logging.getLogger(__name__)
 
 
-async def _queue_function_wrapper(queue, ctx, fail_mode_state=None):
+async def _queue_function_wrapper(queue, ctx, *, fail_mode_state=None):
     """Wrapper for the queue function call.
 
     This wrapper locally manages the declared fail mode of the queue.
@@ -131,9 +131,7 @@ async def queue_worker_tick(queue, job_id: Flake):
      - Locks the given job (if another worker also takes the job via the
      queue they will fail to lock it properly, it works extremely well for
      multiple workers)
-     - Prepares all eventing (start and stop events)
-     - Runs the queue function
-        (fail modes are handled more locally at the call)
+     - Runs the queue function (fail modes are handled locally, at the call)
      - Fetches the result from the underlying asyncio task and updates the
         database with it.
     """
@@ -144,7 +142,7 @@ async def queue_worker_tick(queue, job_id: Flake):
         UPDATE {queue.cls.name}
         SET state = $1, taken_at = (now() at time zone 'utc')
         WHERE job_id = $2 AND state = $3
-        RETURNING args, name
+        RETURNING *
         """,
         JobState.Taken.value,
         str(job_id),
@@ -155,12 +153,9 @@ async def queue_worker_tick(queue, job_id: Flake):
         log.warning("job %r already locked, skipping", job_id)
         return
 
-    # XXX: args????
-    ctx = QueueJobContext(queue, job_id, row["name"])
-
-    task = queue.cls.sched.loop.create_task(
-        _queue_function_wrapper(queue, ctx, row["args"])
-    )
+    args = queue.create_args(row)
+    ctx = QueueJobContext(queue, job_id, row["name"], args)
+    task = queue.cls.sched.loop.create_task(_queue_function_wrapper(queue, ctx))
 
     # TODO add configurable timeout for the tasks?
     await asyncio.wait_for(task, None)
