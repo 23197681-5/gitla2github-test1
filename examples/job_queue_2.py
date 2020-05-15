@@ -74,7 +74,7 @@ def main():
         while True:
             statuses = {}
             for job_id in to_watch:
-                status = await sched.fetch_queue_job_status(job_id)
+                status = await ExampleJobQueue.fetch_job_status(job_id)
                 assert status is not None
                 statuses[job_id] = status
 
@@ -89,7 +89,7 @@ def main():
     # test that the final job id didn't execute in 5 secs
     async def test_final_timeout_fail():
         try:
-            await sched.wait_job(final_job_id, timeout=3)
+            await ExampleJobQueue.wait_job(final_job_id, timeout=3)
         except asyncio.TimeoutError:
             print("======TEST TIMEOUT")
 
