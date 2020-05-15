@@ -105,7 +105,7 @@ def main():
         await sched.wait_job_start(final_job_id)
         print("final job is at work!!")
 
-        await sched.wait_job(final_job_id)
+        await ExampleJobQueue.wait_job(final_job_id)
         print("final job finished!!!")
 
     loop.create_task(watcher())
