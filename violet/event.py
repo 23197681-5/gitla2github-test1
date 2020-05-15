@@ -15,6 +15,9 @@ class JobEvent(asyncio.Event):
         self.counter = 0
         self.empty_event = asyncio.Event()
 
+    def __repr__(self) -> str:
+        return f"<JobEvent counter={self.counter}>"
+
     async def wait(self):
         self.counter += 1
         await super().wait()
