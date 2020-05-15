@@ -27,9 +27,9 @@ class MetaJobQueue(type):
     @property
     def name(cls):
         try:
-            return getattr(cls, "queue_name")
+            return cls.__dict__["name"]
         except AttributeError:
-            raise RuntimeError("Job queues must have the `queue_name` attribute.")
+            raise RuntimeError("Job queues must have the `name` attribute.")
 
     @property
     def poller_rate(cls) -> Tuple[int, float]:
