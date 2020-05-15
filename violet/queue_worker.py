@@ -86,7 +86,7 @@ async def fetch_jobs(
     scheduled_only: bool = False,
     all: bool = False,
 ) -> list:
-    """Fetch a list of jobs based on search parameters."""
+    """Fetch a list of job IDs based on search parameters."""
     log.debug("querying state=%r for queue %r", state, queue.name)
 
     limit_clause = ""
@@ -97,11 +97,10 @@ async def fetch_jobs(
         "AND (now() at time zone 'utc') >= scheduled_at" if scheduled_only else ""
     )
 
-    # XXX: args management?
     return await fetch_with_json(
         queue.cls.sched.db,
         f"""
-        SELECT job_id, name, args
+        SELECT job_id
         FROM {queue.cls.name}
         WHERE
             queue = $1
