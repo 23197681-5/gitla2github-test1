@@ -13,7 +13,18 @@ log = logging.getLogger(__name__)
 QueueArgType = TypeVar("QueueArgType")
 
 
-class JobQueue(Generic[QueueArgType]):
+class MetaJobQueue(type):
+    def __init__(cls, *args, **kwargs):
+        cls._sched = None
+
+    @property
+    def sched(cls):
+        if cls._sched is None:
+            raise RuntimeError("Job queue was not initialized.")
+        return getattr(cls, "_sched")
+
+
+class JobQueue(Generic[QueueArgType], metaclass=MetaJobQueue):
     """Represents a job queue."""
 
     workers = 1
@@ -21,22 +32,6 @@ class JobQueue(Generic[QueueArgType]):
     fail_mode: Optional[FailMode] = None
     poller_takes: int = 1
     poller_seconds: float = 1.0
-
-    @property
-    @classmethod
-    def sched(cls):
-        try:
-            return getattr(cls, "_sched")
-        except AttributeError:
-            raise RuntimeError("Job queue was not initialized.")
-
-    @property
-    @classmethod
-    def name(cls):
-        try:
-            return getattr(cls, "name")
-        except AttributeError:
-            raise RuntimeError("Job queue must have a name attribute.")
 
     @property
     @classmethod
