@@ -29,11 +29,11 @@ class ExampleJobQueue(violet.JobQueue[Tuple[int, int]]):
         await asyncio.sleep(0.5)
 
     @classmethod
-    async def handle(_, ctx):
+    async def handle(cls, ctx):
         a, b = ctx.args
         print(a, b)
-        await ctx.manager.set_job_state(ctx.job_id, {"note": "awoo"})
-        state = await ctx.manager.fetch_job_state(ctx.job_id)
+        await cls.set_job_state(ctx.job_id, {"note": "awoo"})
+        state = await cls.fetch_job_state(ctx.job_id)
         assert state["note"] == "awoo"
 
 
