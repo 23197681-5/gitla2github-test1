@@ -208,7 +208,7 @@ class JobManager:
     async def _queue_worker_wrapper(self, queue: Queue, worker_id: int):
         try:
             async with self.context_creator():
-                await queue_worker(self, queue, worker_id)
+                await queue_worker(queue, worker_id)
 
         except asyncio.CancelledError:
             log.debug("queue worker for %r cancelled", queue.name)
