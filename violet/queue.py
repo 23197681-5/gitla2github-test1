@@ -1,6 +1,8 @@
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Generic, TypeVar
+
 from hail import Flake
+
 from violet.fail_modes import FailMode
 from violet.utils import execute_with_json, fetchrow_with_json
 from violet.models import QueueJobStatus, JobState
@@ -9,7 +11,10 @@ from violet.manager import JobManager
 log = logging.getLogger(__name__)
 
 
-class JobQueue:
+QueueArgType = TypeVar("QueueArgType")
+
+
+class JobQueue(Generic[QueueArgType]):
     """Represents a job queue."""
 
     workers = 1
@@ -38,6 +43,10 @@ class JobQueue:
     @classmethod
     def poller_rate(cls) -> Tuple[int, float]:
         return cls.poller_takes, cls.poller_seconds
+
+    @classmethod
+    def create_args(_, row) -> QueueArgType:
+        ...
 
     @classmethod
     async def setup(_, ctx) -> None:
