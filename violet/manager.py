@@ -7,15 +7,15 @@ import uuid
 import asyncio
 import logging
 import random
-from typing import List, Any, Iterable, Dict, Optional, Union, Callable, Set, Tuple
+from typing import List, Any, Dict, Optional, Union, Set, Tuple
 from collections import defaultdict
 
 from hail import Flake, FlakeFactory
 
 from violet.errors import TaskExistsError, QueueExistsError
-from violet.models import Queue, QueueJobStatus, JobDetails, JobState
+from violet.models import Queue, JobDetails
 from violet.queue_worker import queue_worker, queue_poller
-from violet.utils import execute_with_json, fetchrow_with_json
+from violet.utils import execute_with_json
 from violet.event import JobEvent
 from violet.fail_modes import FailMode, LogOnly, RaiseErr
 from violet.queue import JobQueue
