@@ -53,7 +53,7 @@ class JobQueue(Generic[QueueArgType], metaclass=MetaJobQueue):
     poller_seconds: float = 1.0
 
     @classmethod
-    def create_args(_, row) -> QueueArgType:
+    def map_persisted_row(_, row) -> QueueArgType:
         ...
 
     @classmethod
