@@ -4,9 +4,17 @@
 
 __version__ = "0.3.0"
 
+import violet.errors as errors
 from .manager import JobManager
 from .models import JobState, QueueJobContext
 from .event import JobEvent
 from .queue import JobQueue
 
-__all__ = ["JobManager", "JobState", "QueueJobContext", "JobEvent", "JobQueue"]
+__all__ = [
+    "JobManager",
+    "JobState",
+    "QueueJobContext",
+    "JobEvent",
+    "JobQueue",
+    "errors",
+]
