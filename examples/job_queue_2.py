@@ -17,7 +17,7 @@ class ExampleJobQueue(violet.JobQueue[Tuple[int, int]]):
     args = ("number_a", "number_b")
 
     @classmethod
-    def create_args(cls, row):
+    def map_persisted_row(cls, row):
         return row["number_a"], row["number_b"]
 
     @classmethod

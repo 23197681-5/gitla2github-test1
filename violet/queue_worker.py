@@ -149,7 +149,7 @@ async def queue_worker_tick(queue, job_id: Flake):
         log.warning("job %r already locked, skipping", job_id)
         return
 
-    args = queue.cls.create_args(row)
+    args = queue.cls.map_persisted_row(row)
     ctx = QueueJobContext(queue, job_id, row["name"], args)
     task = queue.cls.sched.loop.create_task(_queue_function_wrapper(queue, ctx))
 
