@@ -224,10 +224,11 @@ class JobManager:
         scheduled_at: Optional[datetime.datetime] = None,
     ) -> Flake:
         """Push data to a job queue."""
+        if not isinstance(args, tuple):
+            raise TypeError("arguments must be a tuple")
+
         if len(args) != len(cls.args):
             raise TypeError("Invalid argument arity")
-
-        # XXX mapping from cls.name to queue state data (asyncio queue etc)
 
         log.debug("try push %r %r", cls.name, args)
         actual_scheduled_at = scheduled_at or datetime.datetime.utcnow()
