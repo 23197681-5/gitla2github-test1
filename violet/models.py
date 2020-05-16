@@ -34,7 +34,7 @@ class FailMode(ABC):
 class Queue:
     name: str
     cls: Any
-    asyncio_queue: asyncio.Queue = asyncio.Queue()
+    asyncio_queue: asyncio.Queue
 
 
 class JobState(enum.IntEnum):

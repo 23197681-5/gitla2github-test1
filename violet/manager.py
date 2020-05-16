@@ -190,7 +190,7 @@ class JobManager:
         if queue_name in self.queues:
             raise QueueExistsError()
 
-        queue = Queue(queue_name, cls)
+        queue = Queue(queue_name, cls, asyncio.Queue(loop=self.loop))
         cls._sched = self
         self.queues[queue_name] = queue
 
