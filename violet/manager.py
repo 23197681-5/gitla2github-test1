@@ -7,17 +7,18 @@ import uuid
 import asyncio
 import logging
 import random
-from typing import List, Any, Iterable, Dict, Optional, Union, Callable, Set
+from typing import List, Any, Dict, Optional, Union, Set, Tuple
 from collections import defaultdict
 
 from hail import Flake, FlakeFactory
 
 from violet.errors import TaskExistsError, QueueExistsError
-from violet.models import Queue, QueueJobStatus, JobDetails, JobState
+from violet.models import Queue, JobDetails
 from violet.queue_worker import queue_worker, queue_poller
-from violet.utils import execute_with_json, fetchrow_with_json
+from violet.utils import execute_with_json
 from violet.event import JobEvent
 from violet.fail_modes import FailMode, LogOnly, RaiseErr
+from violet.queue import JobQueue
 
 log = logging.getLogger(__name__)
 
@@ -149,25 +150,12 @@ class JobManager:
             name, main_coroutine=self._wrapper(ticker_func, [], name, **kwargs)
         )
 
-    def create_job_queue(
-        self,
-        queue_name: str,
-        *,
-        args: Iterable[type],
-        handler: Callable[..., Any],
-        workers: int = 1,
-        start_existing_jobs: bool = True,
-        custom_start_event: bool = False,
-        fail_mode: Optional[FailMode] = None,
-        poller_takes: int = 1,
-        poller_seconds: float = 1.0,
-    ):
+    def register_job_queue(self, cls) -> None:
         """Create a job queue.
 
         The job queue MUST be declared at the start of the application so
         job recovery can happen as soon as possible. It is also required to
-        declare the queue before any queue operations, as they won't know about
-        the queue.
+        declare the queue before any queue operations.
 
         To enhance the concurrency of the queue on high error rates, the first
         consideration is fixing the error first, and the second, is to raise
@@ -191,30 +179,26 @@ class JobManager:
         ``poller_takes`` sets the maximum amount of jobs that will be
         taken by the poller and be inserted into the job queue.
         """
-        fail_mode = fail_mode or RaiseErr(log_error=True)
+        # TODO: move those docs to JobQueue docstrings
+        try:
+            queue_name = getattr(cls, "name")
+        except AttributeError:
+            raise TypeError("Queues must have the name attribute.")
+
+        cls.fail_mode = cls.fail_mode or RaiseErr(log_error=True)
 
         if queue_name in self.queues:
             raise QueueExistsError()
 
-        queue = Queue(
-            queue_name,
-            args,
-            handler,
-            start_existing_jobs,
-            custom_start_event,
-            fail_mode,
-            asyncio.Queue(),
-            (poller_takes, poller_seconds),
-        )
-
+        queue = Queue(queue_name, cls, asyncio.Queue(loop=self.loop))
+        cls._sched = self
         self.queues[queue_name] = queue
 
         # TODO create the resumer task (fetch existing jobs on Taken state
         # and send them to asyncio_queue)
+        self.spawn(queue_poller, [queue], name=f"queue_poller_{queue_name}")
 
-        self.spawn(queue_poller, [self, queue], name=f"queue_poller_{queue_name}")
-
-        for worker_id in range(workers):
+        for worker_id in range(cls.workers):
             self.spawn(
                 self._queue_worker_wrapper,
                 [queue, worker_id],
@@ -224,104 +208,71 @@ class JobManager:
     async def _queue_worker_wrapper(self, queue: Queue, worker_id: int):
         try:
             async with self.context_creator():
-                await queue_worker(self, queue, worker_id)
+                await queue_worker(queue, worker_id)
 
         except asyncio.CancelledError:
             log.debug("queue worker for %r cancelled", queue.name)
         except Exception:
             log.exception("Queue worker for queue %r failed", queue.name)
 
-    async def push_queue(
-        self, queue_name: str, args: List[Any], *, name: Optional[str] = None, **kwargs,
+    async def raw_push(
+        self,
+        cls,
+        args: Tuple[Any],
+        *,
+        name: Optional[str] = None,
+        scheduled_at: Optional[datetime.datetime] = None,
     ) -> Flake:
         """Push data to a job queue."""
+        if not isinstance(args, tuple):
+            raise TypeError("arguments must be a tuple")
 
-        try:
-            queue = self.queues[queue_name]
-        except KeyError:
-            raise ValueError(f"Queue {queue_name} does not exist")
+        if len(args) != len(cls.args):
+            raise TypeError("Invalid argument arity")
 
-        log.debug("try push %r %r", queue_name, args)
-        scheduled_at = kwargs.get("scheduled_at") or datetime.datetime.utcnow()
+        log.debug("try push %r %r", cls.name, args)
+        actual_scheduled_at = scheduled_at or datetime.datetime.utcnow()
 
         job_id = self.factory.get_flake()
         name = name or uuid.uuid4().hex
 
+        arg_line_columns: str = ""
+        if cls.args:
+            # for any declared args on the job queue,
+            # generate "column_a, column_b"
+            arg_line_columns = f', {",".join(cls.args)}'
+
+        arg_line_values: str = ""
+        if args:
+            # for any incoming args, generate "$4, $5..."
+            arg_line_values = ", " + ",".join(
+                f"${index + 4}" for index in range(len(args))
+            )
+
         await execute_with_json(
             self.db,
-            """
-            INSERT INTO violet_jobs
-                (job_id, name, queue, args, scheduled_at)
+            f"""
+            INSERT INTO {cls.name}
+                (job_id, name, scheduled_at{arg_line_columns})
             VALUES
-                ($1, $2, $3, $4, $5)
+                ($1, $2, $3{arg_line_values})
             """,
             str(job_id),
             name,
-            queue_name,
-            args,
-            scheduled_at,
+            actual_scheduled_at,
+            *args,
         )
-        log.debug("pushed %r %r", queue_name, args)
+
+        queue = self.queues[cls.name]
 
         # only dispatch to asyncio queue if it is actually meant to be now.
         # TODO: a better heuristic would be getting the timedelta between
         # given scheduled_at and dispatching to the queue if it is less than
         # 1 second, but this already does the job.
-        if not kwargs.get("scheduled_at"):
+        if scheduled_at is None:
             queue.asyncio_queue.put_nowait(job_id)
 
         return job_id
-
-    async def fetch_queue_job_status(
-        self, job_id: Union[str, Flake]
-    ) -> Optional[QueueJobStatus]:
-        row = await fetchrow_with_json(
-            self.db,
-            """
-            SELECT
-                queue, state, fail_mode, errors, args, inserted_at
-            FROM violet_jobs
-            WHERE
-                job_id = $1
-            """,
-            str(job_id),
-        )
-
-        if row is None:
-            return None
-
-        return QueueJobStatus(*row)
-
-    async def set_job_state(
-        self, job_id: Union[str, Flake], state: Dict[Any, Any]
-    ) -> None:
-        await execute_with_json(
-            self.db,
-            """
-            UPDATE violet_jobs
-            SET internal_state = $1
-            WHERE
-                job_id = $2
-            """,
-            state,
-            str(job_id),
-        )
-
-    async def fetch_job_state(
-        self, job_id: Union[str, Flake]
-    ) -> Optional[Dict[Any, Any]]:
-        row = await fetchrow_with_json(
-            self.db,
-            """
-            SELECT internal_state AS state
-            FROM violet_jobs
-            WHERE
-                job_id = $1
-            """,
-            str(job_id),
-        )
-
-        return row["state"] if row is not None else None
 
     def _remove_task(self, task_id: str) -> None:
         """Remove a job from the internal task list."""
@@ -356,44 +307,6 @@ class JobManager:
 
         if wait and tasks:
             await asyncio.wait(tasks, timeout=timeout)
-
-    async def wait_job(self, any_job_id: Union[str, Flake], *, timeout=None) -> None:
-        """Wait for a job to complete."""
-
-        job_id = str(any_job_id)
-
-        # short-circuit if the given job already completed.
-        # we would hang around forever if we waited for a job that already
-        # released itself (which can happen!)
-        state_int = await self.db.fetchval(
-            """
-            SELECT state
-            FROM violet_jobs
-            WHERE job_id = $1
-            """,
-            job_id,
-        )
-
-        if state_int is None:
-            raise ValueError("Unknown job")
-
-        state = JobState(state_int)
-        log.debug("pre-wait fetch %r %r", state_int, state)
-
-        if state in (JobState.Completed, JobState.Error):
-            return
-
-        async def empty_waiter():
-            await self.events[job_id].empty_event.wait()
-            self.events.pop(job_id)
-            self.empty_waiters.pop(job_id)
-
-        if job_id not in self.empty_waiters:
-            self.empty_waiters[job_id] = self.spawn(
-                empty_waiter, [], name=f"empty_waiter:{job_id}"
-            )
-
-        await asyncio.wait_for(self.events[job_id].wait(), timeout)
 
     async def wait_job_start(
         self, any_job_id: Union[str, Flake], *, timeout=None

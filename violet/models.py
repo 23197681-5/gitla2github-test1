@@ -33,13 +33,8 @@ class FailMode(ABC):
 @dataclass
 class Queue:
     name: str
-    args: Iterable[type]
-    function: Callable[..., Awaitable[Any]]
-    start_existing_jobs: bool
-    custom_start_event: bool
-    fail_mode: FailMode
+    cls: Any
     asyncio_queue: asyncio.Queue
-    poller_rate: Tuple[int, float]
 
 
 class JobState(enum.IntEnum):
@@ -51,32 +46,18 @@ class JobState(enum.IntEnum):
 
 @dataclass
 class QueueJobStatus:
-    queue_name: str
+    """Represents the status of a job in a job queue."""
+
     state: JobState
-    fail_mode: str
     errors: str
-    args: Iterable[type]
     inserted_at: datetime.datetime
+    scheduled_at: datetime.datetime
+    taken_at: datetime.datetime
 
 
 @dataclass
 class QueueJobContext:
-    # TODO fix typing and recursive import that would happen for this maybe
-    manager: Any
     queue: Queue
     job_id: Flake
     name: str
-
-    def set_start(self):
-        """Set the start event on the job. Raises RuntimeError if the queue
-        is not configured for custom start events."""
-        job_id_str = str(self.job_id)
-
-        if not self.queue.custom_start_event:
-            raise RuntimeError("Queue isn't configured for custom start events")
-
-        if job_id_str in self.manager.start_events:
-            self.manager.start_events[job_id_str].set()
-
-    async def set_state(self, state) -> None:
-        await self.manager.set_job_state(self.job_id, state)
+    args: Any

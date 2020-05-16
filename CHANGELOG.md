@@ -1,3 +1,19 @@
+# 0.3 (WIP)
+
+ - major breaking refactor of job queues
+   - database structure changed heavily. instead of a single `violet_jobs`
+     table, there's one table per job queue.
+   - job queues are now declared via a class, instead of registering manually
+     to the job manager. `sched.create_job_queue` => `sched.register_job_queue`
+   - job queues can declare non-jsonb parameters via their table's columns.
+   - APIs that were on `JobManager` are now on the job queue class itself.
+   - `custom_start_event` is dropped in favor of `setup` / `handle`
+     classmethods
+   - `sched.push_queue("your_job_queue", ...)` => `YourJobQueue.push(...)`
+   - `sched.fetch_queue_job_status(job_id)` => `YourJobQueue.fetch_job_status(job_id)`
+   - `sched.wait_job(job_id, ...)` => `YourJobQueue.wait_job(job_id, ...)`
+   - Note: `sched.wait_job_start` **did not change**
+
 # 0.2.3
 
  - add custom start events
