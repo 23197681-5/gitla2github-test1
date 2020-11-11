@@ -40,12 +40,11 @@ class JobManager:
     def __init__(
         self,
         *,
-        loop=None,
         db=None,
         context_function=None,
         node_id: Optional[int] = None,
     ):
-        self.loop = loop or asyncio.get_event_loop()
+        self.loop = asyncio.get_event_loop()
         self.db = db
         self.tasks: Dict[str, asyncio.Task] = {}
         self.queues: Dict[str, Queue] = {}
@@ -190,7 +189,7 @@ class JobManager:
         if queue_name in self.queues:
             raise QueueExistsError()
 
-        queue = Queue(queue_name, cls, asyncio.Queue(loop=self.loop))
+        queue = Queue(queue_name, cls, asyncio.Queue())
         cls._sched = self
         self.queues[queue_name] = queue
 
