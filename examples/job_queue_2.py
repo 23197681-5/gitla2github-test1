@@ -42,7 +42,6 @@ def main():
 
     loop = asyncio.get_event_loop()
     sched = violet.JobManager(
-        loop=loop,
         db=loop.run_until_complete(
             asyncpg.create_pool(
                 host="localhost",

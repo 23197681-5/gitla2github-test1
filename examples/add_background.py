@@ -17,7 +17,7 @@ async def my_function(a, b):
 
 def main():
     loop = asyncio.get_event_loop()
-    sched = JobManager(loop=loop)
+    sched = JobManager()
     task = sched.spawn(
         my_function,
         [2, 2],
