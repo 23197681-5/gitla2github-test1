@@ -114,9 +114,14 @@ class JobManager:
         if mode is not None and not isinstance(mode, FailMode):
             raise ValueError("Failure modes must be instances of FailMode.")
 
-        return self._create_task(
+        task = self._create_task(
             name, main_coroutine=self._wrapper(function, args, name, **kwargs)
         )
+
+        if kwargs.get("set_asyncio_name", True):
+            task.set_name(name)
+
+        return task
 
     def spawn_periodic(
         self,
@@ -145,9 +150,14 @@ class JobManager:
                 if not reverse:
                     await asyncio.sleep(period)
 
-        return self._create_task(
+        task = self._create_task(
             name, main_coroutine=self._wrapper(ticker_func, [], name, **kwargs)
         )
+
+        if kwargs.get("set_asyncio_name", True):
+            task.set_name(name)
+
+        return task
 
     def register_job_queue(self, cls) -> None:
         """Create a job queue.
