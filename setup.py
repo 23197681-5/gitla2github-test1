@@ -21,6 +21,6 @@ setup(
     package_data={"violet": ["py.typed"]},
     install_requires=[
         "asyncpg>0.20",
-        "hail @ git+https://gitlab.com/elixire/hail.git@d481786d256e682f6992ca250e9f8516205d0608#egg=hail",
+        "hail @ git+https://gitlab.com/elixire/hail.git@0c1570ded9fc17d40619edf559e72664ca3fb5b7#egg=hail",
     ],
 )
