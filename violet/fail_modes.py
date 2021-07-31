@@ -6,7 +6,7 @@ import random
 import logging
 from decimal import Decimal
 from asyncio import sleep
-from typing import Optional, Type, Tuple, Union
+from typing import Optional, Type, Tuple, Union, List
 
 from violet.models import FailMode
 
