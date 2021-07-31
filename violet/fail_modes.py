@@ -28,10 +28,19 @@ class RaiseErr(FailMode):
     to get the exception via task.result()
     """
 
-    def __init__(self, *, log_error: bool = True):
+    def __init__(
+        self,
+        *,
+        log_error: bool = True,
+        omit_exceptions: Optional[List[Type[Exception]]] = None,
+    ):
         self.log_error = log_error
+        self.omit_exceptions = omit_exceptions
 
     async def handle(self, job, exc, _state) -> bool:
+        if isinstance(exc, self.omit_exceptions):
+            raise exc
+
         if self.log_error:
             await LogOnly().handle(job, exc, _state)
 
