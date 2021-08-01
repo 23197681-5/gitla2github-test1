@@ -59,6 +59,9 @@ The simple subset of violet features can be described by
     # wait for the job to finish
     await sched.wait_job(job_id)
 
+    # finished with the scheduler? make it stop all running jobs
+    await sched.stop_all(wait=True)
+
 Install
 --------
 
