@@ -77,7 +77,7 @@ class JobManager:
         try:
             log.debug("task tick: %r", task_id)
             async with self.context_creator():
-                await function(*args)
+                return await function(*args)
         except asyncio.CancelledError:
             log.debug("task %r cancelled", task_id)
         except Exception as exc:
