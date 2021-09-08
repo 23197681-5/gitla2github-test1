@@ -20,7 +20,7 @@ setup(
     package_dir={"": "."},
     package_data={"violet": ["py.typed"]},
     install_requires=[
-        "asyncpg>0.20",
-        "hail @ git+https://gitlab.com/elixire/hail.git@0c1570ded9fc17d40619edf559e72664ca3fb5b7#egg=hail",
+        "hail @ git+https://gitlab.com/elixire/hail.git@1133e3c25f8eb6b8ff6c65c7ebac57071c3275d9#egg=hail",
     ],
+    extras_require={"asyncpg": ["asyncpg > 0.20"]},
 )
