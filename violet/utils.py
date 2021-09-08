@@ -9,11 +9,17 @@ import json
 async def pg_set_json(con):
     """Set JSON and JSONB codecs for an asyncpg connection."""
     await con.set_type_codec(
-        "json", encoder=json.dumps, decoder=json.loads, schema="pg_catalog",
+        "json",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
     )
 
     await con.set_type_codec(
-        "jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog",
+        "jsonb",
+        encoder=json.dumps,
+        decoder=json.loads,
+        schema="pg_catalog",
     )
 
 
