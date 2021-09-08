@@ -18,7 +18,6 @@ from violet.queue_worker import queue_worker, queue_poller
 from violet.utils import execute_with_json
 from violet.event import JobEvent
 from violet.fail_modes import FailMode, LogOnly, RaiseErr
-from violet.queue import JobQueue
 
 log = logging.getLogger(__name__)
 

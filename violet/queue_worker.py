@@ -5,7 +5,6 @@
 import logging
 import asyncio
 import traceback
-from typing import Set
 
 from hail import Flake
 from .models import Queue, JobState, QueueJobContext, JobDetails
