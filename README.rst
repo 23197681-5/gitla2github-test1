@@ -67,6 +67,10 @@ Install
 
 TODO: publish on pypi?
 
-::
+.. code-block:: sh
 
     pip install git+https://gitlab.com/elixire/violet@master
+
+    # violet does not explicitly depend on asyncpg, but if you want to use
+    # the job queue features of violet, an asyncpg connection must be given.
+    pip install asyncpg>0.20
