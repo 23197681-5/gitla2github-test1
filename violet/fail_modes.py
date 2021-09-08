@@ -35,7 +35,7 @@ class RaiseErr(FailMode):
         omit_exceptions: Optional[List[Type[Exception]]] = None,
     ):
         self.log_error = log_error
-        self.omit_exceptions = omit_exceptions
+        self.omit_exceptions = omit_exceptions or tuple()
 
     async def handle(self, job, exc, _state) -> bool:
         if isinstance(exc, self.omit_exceptions):
