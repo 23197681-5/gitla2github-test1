@@ -1,4 +1,5 @@
 import asyncio
+from dataclasses import dataclass
 from violet import JobManager, __version__
 from violet.fail_modes import RaiseErr
 
@@ -45,3 +46,28 @@ def test_simple_spawn(event_loop):
         assert False  # task supposed to have an error did not have an error
     except CustomError:
         assert True  # Task had an error, which is good
+
+
+@dataclass
+class Tick:
+    value: int
+
+
+async def my_periodic_function(tick):
+    if tick.value < 5:
+        tick.value += 1
+
+
+def test_periodic(event_loop):
+    sched = JobManager()
+    tick = Tick(0)
+    task = sched.spawn_periodic(
+        my_periodic_function,
+        [tick],
+        period=0.1,
+        name="my_periodic_function",
+    )
+    event_loop.call_soon(task)
+    event_loop.run_until_complete(asyncio.sleep(1))
+
+    assert tick.value == 5
