@@ -54,8 +54,8 @@ def test_job_queues():
     sched = violet.JobManager(
         db=loop.run_until_complete(
             asyncpg.create_pool(
-                host="localhost",
-                port="5432",
+                host=os.getenv("PSQL_HOST") or "localhost",
+                port=os.getenv("PSQL_PORT") or "5432",
                 user=os.getenv("PSQL_USER"),
                 password=os.getenv("PSQL_PASS"),
                 database=os.getenv("PSQL_DB"),

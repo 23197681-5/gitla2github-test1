@@ -24,4 +24,4 @@ tests:
     - ls -la
     - pwd
     - time psql -h postgres -U postgres -f schema.sql
-    - time tox
+    - time env PSQL_HOST=postgres PSQL_USER=postgres PSQL_DB=postgres tox
