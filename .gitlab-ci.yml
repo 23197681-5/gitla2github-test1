@@ -1,0 +1,27 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache"
+  POSTGRES_HOST_AUTH_METHOD: "trust"
+
+services:
+  - postgres:alpine
+
+tests:
+  image: python:3.9-buster
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - .cache/
+  before_script:
+    - rm -rf .tox
+    - time apt update
+    - time apt install -y build-essential postgresql-client
+    - python -V
+    - pip -V
+    - python3 -V
+    - pip3 -V
+    - time pip3 install wheel tox
+  script:
+    - ls -la
+    - pwd
+    - time psql -h postgres -U postgres -f schema.sql
+    - time tox
