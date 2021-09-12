@@ -123,13 +123,23 @@ def test_job_queue_scheduled_at(sched, event_loop):
         for num in range(2)
     ]
 
+    # wait 0.7 seconds, assert they didn't get worked on
+
+    event_loop.run_until_complete(asyncio.sleep(0.7))
+
     job_statuses = event_loop.run_until_complete(fetch_all_statuses(job_ids))
     for status in job_statuses.values():
         assert status.state == violet.JobState.NotTaken
 
-    # since everyone is scheduled 1 second after creation, if we wait 2 or 3
-    # seconds, everyone should be done
-    event_loop.run_until_complete(asyncio.sleep(4))
+    # wait 3 seconds, and assert that the jobs got worked on.
+    #
+    # since they are scheduled to 1.5 seconds after test start,
+    # this should work
+    #
+    # we also only spawn 2 jobs because the poller task by default is 1/1, so
+    # itll take 2 seconds to tick them both
+
+    event_loop.run_until_complete(asyncio.sleep(3))
 
     job_statuses_after_run = event_loop.run_until_complete(fetch_all_statuses(job_ids))
     for status in job_statuses_after_run.values():
