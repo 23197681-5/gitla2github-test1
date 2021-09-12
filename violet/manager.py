@@ -201,10 +201,7 @@ class JobManager:
         cls._sched = self
         self.queues[queue_name] = queue
 
-        # TODO create the resumer task (fetch existing jobs on Taken state
-        # and send them to asyncio_queue)
         self.spawn(queue_poller, [queue], name=f"queue_poller_{queue_name}")
-
         for worker_id in range(cls.workers):
             self.spawn(
                 self._queue_worker_wrapper,
