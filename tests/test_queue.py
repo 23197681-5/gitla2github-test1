@@ -1,9 +1,7 @@
-import os
 import logging
 import asyncio
 from typing import List, Tuple
 
-import asyncpg
 import violet
 from hail import Flake
 
@@ -47,28 +45,13 @@ async def fetch_all_statuses(job_ids):
     return job_statuses
 
 
-def test_job_queues():
-    logging.basicConfig(level=logging.DEBUG)
-
-    loop = asyncio.get_event_loop()
-    sched = violet.JobManager(
-        db=loop.run_until_complete(
-            asyncpg.create_pool(
-                host=os.getenv("PSQL_HOST") or "localhost",
-                port=os.getenv("PSQL_PORT") or "5432",
-                user=os.getenv("PSQL_USER"),
-                password=os.getenv("PSQL_PASS"),
-                database=os.getenv("PSQL_DB"),
-            )
-        ),
-    )
-
+def test_job_queues(sched, event_loop):
     sched.register_job_queue(ExampleJobQueue)
 
     job_ids: List[str] = []
 
     for num in range(8):
-        job_id = loop.run_until_complete(ExampleJobQueue.push(num, num))
+        job_id = event_loop.run_until_complete(ExampleJobQueue.push(num, num))
         job_ids.append(job_id)
         logging.info("created queue job %s with args %r", job_id, [num, num])
 
@@ -110,17 +93,17 @@ def test_job_queues():
         assert status is not None
         assert status.state == violet.JobState.Completed
 
-    loop.create_task(inner_test_wait_final_job())
-    loop.create_task(inner_test_final_timeout_fail())
-    loop.create_task(inner_test_start_timeout_fail())
+    event_loop.create_task(inner_test_wait_final_job())
+    event_loop.create_task(inner_test_final_timeout_fail())
+    event_loop.create_task(inner_test_start_timeout_fail())
 
     try:
-        loop.run_until_complete(watcher())
+        event_loop.run_until_complete(watcher())
     finally:
-        loop.run_until_complete(sched.stop_all())
+        event_loop.run_until_complete(sched.stop_all())
 
     # assert everyone is finished up
-    job_statuses_after_run = loop.run_until_complete(fetch_all_statuses(job_ids))
+    job_statuses_after_run = event_loop.run_until_complete(fetch_all_statuses(job_ids))
     assert all(
         status.state == violet.JobState.Completed
         for status in job_statuses_after_run.values()
