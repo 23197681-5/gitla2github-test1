@@ -96,7 +96,6 @@ class JobManager:
                 kwargs["_wrapper_state"] = state
                 return await self._wrapper(function, args, task_id, **kwargs)
         finally:
-            # TODO failure modes for single tasks
             self._remove_task(task_id)
 
     def spawn(self, function, args: List[Any], *, name: str, **kwargs) -> asyncio.Task:
