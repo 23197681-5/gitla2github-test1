@@ -1,6 +1,7 @@
 import logging
 import asyncio
 from typing import List, Tuple
+from datetime import datetime, timedelta
 
 import violet
 from hail import Flake
@@ -36,7 +37,7 @@ class ExampleJobQueue(violet.JobQueue[Tuple[int, int]]):
         assert state["b"] == b
 
 
-async def fetch_all_statuses(job_ids):
+async def fetch_all_statuses(job_ids) -> dict:
     # map job ids list to job id statuses dict
     job_statuses = {
         job_id: (await ExampleJobQueue.fetch_job_status(job_id)) for job_id in job_ids
@@ -108,3 +109,28 @@ def test_job_queues(sched, event_loop):
         status.state == violet.JobState.Completed
         for status in job_statuses_after_run.values()
     )
+
+
+def test_job_queue_scheduled_at(sched, event_loop):
+    sched.register_job_queue(ExampleJobQueue)
+
+    job_ids: List[str] = [
+        event_loop.run_until_complete(
+            ExampleJobQueue.push(
+                num, num, scheduled_at=datetime.utcnow() + timedelta(seconds=1.5)
+            )
+        )
+        for num in range(2)
+    ]
+
+    job_statuses = event_loop.run_until_complete(fetch_all_statuses(job_ids))
+    for status in job_statuses.values():
+        assert status.state == violet.JobState.NotTaken
+
+    # since everyone is scheduled 1 second after creation, if we wait 2 or 3
+    # seconds, everyone should be done
+    event_loop.run_until_complete(asyncio.sleep(4))
+
+    job_statuses_after_run = event_loop.run_until_complete(fetch_all_statuses(job_ids))
+    for status in job_statuses_after_run.values():
+        assert status.state == violet.JobState.Completed

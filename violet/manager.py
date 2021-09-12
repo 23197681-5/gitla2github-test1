@@ -269,11 +269,20 @@ class JobManager:
 
         queue = self.queues[cls.name]
 
-        # only dispatch to asyncio queue if it is actually meant to be now.
-        # TODO: a better heuristic would be getting the timedelta between
-        # given scheduled_at and dispatching to the queue if it is less than
-        # 1 second, but this already does the job.
+        # Only dispatch to asyncio_queue if the task is meant to be run now,
+        # which happens when either is true:
+        #  - No scheduled_at
+        #  - Time difference between scheduled_at and now is lower than
+        #  	the queue's tick period (defined by the poller_takes
+        #  	queue configuration value).
         if scheduled_at is None:
+            should_schedule_now = True
+        else:
+            now = datetime.datetime.utcnow()
+            time_until_hit = scheduled_at - now
+            should_schedule_now = time_until_hit.total_seconds() < cls.poller_seconds
+
+        if should_schedule_now:
             queue.asyncio_queue.put_nowait(job_id)
 
         return job_id
